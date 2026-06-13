@@ -9,6 +9,7 @@ import {
   JellyfinItem,
 } from '../lib/jellyfin';
 import { Video } from '../types';
+import { Icon } from './Icon';
 
 interface Props {
   onAdd: (video: Video) => void;
@@ -34,18 +35,14 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
 
   useEffect(() => {
     load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentParentId]);
 
   async function load(searchTerm?: string) {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchItems({
-        parentId: currentParentId,
-        search: searchTerm,
-        limit: 50,
-      });
+      const data = await fetchItems({ parentId: currentParentId, search: searchTerm, limit: 50 });
       setItems(data.Items);
     } catch {
       setError('Failed to load library. Check your Jellyfin config.');
@@ -75,9 +72,7 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
         streamUrl,
         isHls,
         thumbnailUrl: thumbnailUrl(item.Id),
-        duration: item.RunTimeTicks
-          ? Math.floor(item.RunTimeTicks / 10_000_000)
-          : undefined,
+        duration: item.RunTimeTicks ? Math.floor(item.RunTimeTicks / 10_000_000) : undefined,
         jellyfinId: item.Id,
       });
     } catch (err) {
@@ -93,51 +88,92 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="w-full max-w-2xl bg-gray-800 rounded-xl flex flex-col max-h-[80vh]">
+    <div
+      onClick={onClose}
+      className="animate-pop-in"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'grid', placeItems: 'center',
+        background: 'var(--scrim)', backdropFilter: 'blur(4px)', padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: 620, maxHeight: '82vh',
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow)', overflow: 'hidden',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h2 className="text-lg font-semibold text-white">Browse Library</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">×</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <span style={{
+              width: 38, height: 38, borderRadius: 'var(--r-md)',
+              background: 'var(--accent-soft)', color: 'var(--accent)',
+              display: 'grid', placeItems: 'center',
+            }}>
+              <Icon name="folder" size={20} />
+            </span>
+            <div>
+              <h2 className="font-display" style={{ fontSize: 20, fontWeight: 600, margin: 0, color: 'var(--text)' }}>
+                Your library
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--text-faint)', marginTop: 1 }}>
+                {breadcrumbs.map((crumb, i) => (
+                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    {i > 0 && <Icon name="chevron" size={11} />}
+                    <button
+                      onClick={() => navigateTo(i)}
+                      style={{
+                        background: 'none', border: 'none', padding: 0,
+                        fontWeight: 700, fontSize: 12.5,
+                        color: i === breadcrumbs.length - 1 ? 'var(--text)' : 'var(--text-faint)',
+                      }}
+                    >
+                      {crumb.name}
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              width: 34, height: 34, borderRadius: '50%',
+              border: '1px solid var(--border)', background: 'var(--surface-2)',
+              color: 'var(--text-dim)', display: 'grid', placeItems: 'center',
+            }}
+          >
+            <Icon name="close" size={18} />
+          </button>
         </div>
 
         {/* Search */}
-        <form onSubmit={handleSearch} className="flex gap-2 px-4 py-2">
-          <input
-            className="flex-1 px-3 py-1.5 text-sm bg-gray-700 text-white rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
-            placeholder="Search…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
-          >
-            Search
-          </button>
-        </form>
-
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-1 px-4 py-1 text-sm text-gray-400 flex-wrap">
-          {breadcrumbs.map((crumb, i) => (
-            <span key={i} className="flex items-center gap-1">
-              {i > 0 && <span>/</span>}
-              <button
-                className="hover:text-white transition-colors"
-                onClick={() => navigateTo(i)}
-              >
-                {crumb.name}
-              </button>
-            </span>
-          ))}
+        <div style={{ padding: '0 20px 14px' }}>
+          <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)', background: 'var(--surface-2)' }}>
+            <Icon name="search" size={17} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search your server…"
+              style={{ flex: 1, border: 'none', background: 'none', color: 'var(--text)', fontSize: 14.5, fontWeight: 600, outline: 'none' }}
+            />
+          </form>
         </div>
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1 min-h-0">
-          {loading && <p className="text-gray-400 text-sm py-4 text-center">Loading…</p>}
-          {error && <p className="text-red-400 text-sm">{error}</p>}
-          {!loading && items.length === 0 && (
-            <p className="text-gray-500 text-sm py-4 text-center">No items found.</p>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {loading && (
+            <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontWeight: 600, padding: '30px 0' }}>Loading…</p>
+          )}
+          {error && (
+            <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13.5, padding: '8px 0' }}>{error}</p>
+          )}
+          {!loading && items.length === 0 && !error && (
+            <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontWeight: 600, padding: '30px 0' }}>No items found.</p>
           )}
           {items.map((item) => {
             const browseable = BROWSEABLE_TYPES.has(item.Type);
@@ -145,36 +181,57 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
             return (
               <div
                 key={item.Id}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-700 group"
+                style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 10, borderRadius: 'var(--r-md)' }}
               >
-                <img
-                  src={thumbnailUrl(item.Id)}
-                  alt=""
-                  className="w-12 h-16 object-cover rounded flex-shrink-0 bg-gray-700"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{item.Name}</p>
-                  <p className="text-xs text-gray-500">
-                    {item.Type}
-                    {item.RunTimeTicks ? ` · ${formatDuration(item.RunTimeTicks)}` : ''}
-                  </p>
+                {playable ? (
+                  <img
+                    src={thumbnailUrl(item.Id)}
+                    alt=""
+                    style={{ width: 44, height: 62, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: 'var(--surface-3)' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <span style={{
+                    width: 44, height: 62, borderRadius: 8,
+                    background: 'var(--surface-3)', color: 'var(--text-faint)',
+                    display: 'grid', placeItems: 'center', flexShrink: 0,
+                  }}>
+                    <Icon name="folder" size={22} />
+                  </span>
+                )}
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text)' }}>{item.Name}</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-faint)' }}>
+                    {item.Type}{item.RunTimeTicks ? ` · ${formatDuration(item.RunTimeTicks)}` : ''}
+                  </div>
                 </div>
+
                 {browseable && (
                   <button
                     onClick={() => navigate(item)}
-                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-gray-600 hover:bg-gray-500"
+                    style={{
+                      padding: '8px 15px', borderRadius: 'var(--r-sm)',
+                      border: '1.5px solid var(--border)', background: 'var(--surface)',
+                      color: 'var(--text)', fontWeight: 800, fontSize: 13,
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
                   >
-                    Open
+                    Open <Icon name="chevron" size={14} />
                   </button>
                 )}
                 {playable && (
                   <button
                     onClick={() => addToQueue(item)}
                     disabled={adding === item.Id}
-                    className="text-xs text-white px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50"
+                    style={{
+                      padding: '8px 15px', borderRadius: 'var(--r-sm)', border: 'none',
+                      background: 'var(--accent)', color: 'var(--accent-ink)',
+                      fontWeight: 800, fontSize: 13, opacity: adding === item.Id ? 0.5 : 1,
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
                   >
-                    {adding === item.Id ? '…' : '+ Queue'}
+                    <Icon name="plus" size={15} /> {adding === item.Id ? '…' : 'Queue'}
                   </button>
                 )}
               </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChatMessage } from '../types';
+import { Icon } from './Icon';
 
 interface Props {
   messages: ChatMessage[];
@@ -23,43 +24,73 @@ export function Chat({ messages, currentMemberId, onSend }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-64 border-t border-gray-700">
-      <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-        Chat
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: 'clamp(180px, 30vh, 248px)',
+      borderTop: '1px solid var(--border)',
+    }}>
+      {/* Section label */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '0 16px', height: 34, flexShrink: 0,
+        fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em',
+        textTransform: 'uppercase', color: 'var(--text-faint)',
+      }}>
+        <Icon name="chat" size={13} /> Chat
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 space-y-1 min-h-0">
-        {messages.map((msg) => (
-          <div key={msg.id} className="text-sm">
-            <span
-              className={
-                msg.memberId === currentMemberId
-                  ? 'font-semibold text-indigo-400'
-                  : 'font-semibold text-gray-300'
-              }
-            >
-              {msg.username}
-            </span>
-            <span className="text-gray-400 ml-1">{msg.text}</span>
-          </div>
-        ))}
+      {/* Messages */}
+      <div style={{
+        flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
+        padding: '4px 14px', display: 'flex', flexDirection: 'column', gap: 9,
+      }}>
+        {messages.map((msg) => {
+          const isMe = msg.memberId === currentMemberId;
+          return (
+            <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+              {!isMe && (
+                <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--accent)', marginBottom: 2, paddingLeft: 2 }}>
+                  {msg.username}
+                </span>
+              )}
+              <span style={{
+                maxWidth: '86%', padding: '8px 12px',
+                borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                background: isMe ? 'var(--accent)' : 'var(--surface-2)',
+                color: isMe ? 'var(--accent-ink)' : 'var(--text)',
+                fontSize: 13.5, fontWeight: 600, lineHeight: 1.35,
+              }}>
+                {msg.text}
+              </span>
+            </div>
+          );
+        })}
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex gap-2 p-2">
+      {/* Input row */}
+      <div style={{ display: 'flex', gap: 8, padding: 10, flexShrink: 0 }}>
         <input
-          className="flex-1 px-3 py-1.5 text-sm bg-gray-700 text-white rounded-lg outline-none focus:ring-1 focus:ring-indigo-500"
-          placeholder="Say something…"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
+          placeholder="Say something…"
           maxLength={500}
+          style={{
+            flex: 1, padding: '10px 14px', borderRadius: 99,
+            border: '1.5px solid var(--border)', background: 'var(--surface-2)',
+            color: 'var(--text)', fontSize: 13.5, fontWeight: 600, outline: 'none',
+          }}
         />
         <button
           onClick={send}
-          className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+          style={{
+            width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
+            background: 'var(--accent)', color: 'var(--accent-ink)',
+            display: 'grid', placeItems: 'center',
+          }}
         >
-          Send
+          <Icon name="send" size={17} />
         </button>
       </div>
     </div>

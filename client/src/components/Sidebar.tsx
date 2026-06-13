@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Room, Video } from '../types';
 import { JellyfinBrowser } from './JellyfinBrowser';
+import { Icon } from './Icon';
 
 interface Props {
   room: Room;
@@ -10,31 +11,86 @@ interface Props {
   onAddVideo: (video: Video) => void;
 }
 
+const MEMBER_COLORS = ['#ff7a52', '#6fae8e', '#5e6fb5', '#d98b9e', '#c98a52', '#7fa6cf', '#9b6ae0', '#3fae93'];
+
+function memberColor(index: number) {
+  return MEMBER_COLORS[index % MEMBER_COLORS.length];
+}
+
+function CopyPin({ pin }: { pin: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    navigator.clipboard.writeText(pin).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <button onClick={copy} style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', padding: '12px 14px', borderRadius: 'var(--r-md)',
+      border: '1.5px dashed var(--border)', background: 'var(--surface-2)',
+      color: 'var(--text)',
+    }}>
+      <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
+        Room PIN
+      </span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+        <span className="font-display" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '.18em', color: 'var(--accent)' }}>
+          {pin}
+        </span>
+        <span style={{ fontSize: 11.5, fontWeight: 800, color: copied ? 'var(--online)' : 'var(--text-faint)' }}>
+          {copied ? 'Copied!' : 'Copy'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, onAddVideo }: Props) {
   const [showBrowser, setShowBrowser] = useState(false);
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Room info */}
-      <div className="px-4 py-3 border-b border-gray-700">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Room PIN</span>
-          <span className="text-lg font-bold text-white tracking-widest">{room.pin}</span>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      {/* PIN */}
+      <div style={{ padding: '14px 16px 6px' }}>
+        <CopyPin pin={room.pin} />
       </div>
 
       {/* Members */}
-      <div className="px-4 py-2 border-b border-gray-700">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
-          Members ({room.members.length})
-        </p>
-        <div className="space-y-0.5">
-          {room.members.map((m) => (
-            <div key={m.id} className="flex items-center gap-2 text-sm">
-              <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-              <span className="text-gray-200 truncate">{m.username}</span>
+      <div style={{ borderTop: '1px solid var(--border-soft)', marginTop: 6 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', padding: '0 16px', height: 34,
+          fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em',
+          textTransform: 'uppercase', color: 'var(--text-faint)', gap: 7,
+        }}>
+          <Icon name="users" size={13} /> Watching · {room.members.length}
+        </div>
+        <div style={{ padding: '2px 8px 8px' }}>
+          {room.members.map((m, i) => (
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--r-sm)' }}>
+              <span style={{ position: 'relative', flexShrink: 0 }}>
+                <span style={{
+                  width: 30, height: 30, borderRadius: '50%',
+                  background: memberColor(i), color: '#fff',
+                  display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
+                }}>
+                  {m.username[0].toUpperCase()}
+                </span>
+                <span style={{
+                  position: 'absolute', right: -1, bottom: -1,
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: 'var(--online)', border: '2px solid var(--surface)',
+                }} />
+              </span>
+              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{m.username}</span>
               {m.isHost && (
-                <span className="ml-auto text-xs text-indigo-400 font-medium">host</span>
+                <span style={{
+                  marginLeft: 'auto', fontSize: 11, fontWeight: 800,
+                  color: 'var(--accent)', background: 'var(--accent-soft)',
+                  padding: '3px 9px', borderRadius: 99,
+                }}>HOST</span>
               )}
             </div>
           ))}
@@ -42,64 +98,90 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
       </div>
 
       {/* Queue */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="flex items-center justify-between px-4 py-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Queue</p>
+      <div style={{ borderTop: '1px solid var(--border-soft)', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 16px', height: 34, flexShrink: 0,
+        }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>
+            <Icon name="list" size={13} /> Up next
+          </span>
           {isHost && (
             <button
               onClick={() => setShowBrowser(true)}
-              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                fontSize: 12.5, fontWeight: 800, color: 'var(--accent)',
+                background: 'var(--accent-soft)', border: 'none',
+                padding: '5px 11px', borderRadius: 99,
+              }}
             >
-              + Add
+              <Icon name="plus" size={14} /> Add
             </button>
           )}
         </div>
 
-        {room.queue.length === 0 && (
-          <p className="text-gray-600 text-sm text-center py-4 px-4">
-            {isHost ? 'Add something to watch.' : 'Queue is empty.'}
-          </p>
-        )}
-
-        <div className="space-y-1 px-2 pb-2">
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {room.queue.length === 0 && (
+            <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5, fontWeight: 600, padding: '20px 0' }}>
+              {isHost ? 'Add something to watch.' : "Queue's empty."}
+            </p>
+          )}
           {room.queue.map((video, index) => {
             const isCurrent = index === room.currentVideoIndex;
             return (
               <div
                 key={video.id}
-                className={`flex items-center gap-2 p-2 rounded-lg group ${
-                  isCurrent ? 'bg-indigo-900/40 ring-1 ring-indigo-500' : 'hover:bg-gray-700'
-                }`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 11,
+                  padding: 8, borderRadius: 'var(--r-md)',
+                  background: isCurrent ? 'var(--accent-soft)' : 'transparent',
+                  boxShadow: isCurrent ? 'inset 0 0 0 1.5px var(--accent)' : 'none',
+                }}
               >
-                {video.thumbnailUrl && (
+                {/* Thumbnail or gradient fallback */}
+                {video.thumbnailUrl ? (
                   <img
                     src={video.thumbnailUrl}
                     alt=""
-                    className="w-8 h-10 object-cover rounded flex-shrink-0 bg-gray-700"
+                    style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: 'var(--surface-3)' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
+                ) : (
+                  <div style={{
+                    width: 36, height: 50, borderRadius: 8, flexShrink: 0,
+                    background: `linear-gradient(150deg, ${MEMBER_COLORS[index % MEMBER_COLORS.length]}, #1a1a2e)`,
+                  }} />
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white truncate">{video.title}</p>
-                  {isCurrent && (
-                    <p className="text-xs text-indigo-400">Now playing</p>
-                  )}
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {video.title}
+                  </div>
+                  {isCurrent
+                    ? <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)' }}>Now playing</div>
+                    : video.duration
+                      ? <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-faint)' }}>{formatDuration(video.duration)}</div>
+                      : null}
                 </div>
+
                 {isHost && (
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                     {!isCurrent && (
                       <button
                         onClick={() => onSetCurrentVideo(index)}
-                        className="text-xs text-gray-400 hover:text-white px-1.5 py-0.5 rounded bg-gray-600"
+                        title="Play now"
+                        style={miniBtn}
                       >
-                        Play
+                        <Icon name="play" size={13} />
                       </button>
                     )}
                     <button
                       onClick={() => onRemoveFromQueue(index)}
-                      className="text-xs text-gray-400 hover:text-red-400 px-1.5 py-0.5 rounded bg-gray-600"
+                      title="Remove"
+                      style={miniBtn}
                     >
-                      ✕
+                      <Icon name="close" size={13} />
                     </button>
                   </div>
                 )}
@@ -111,13 +193,24 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
 
       {showBrowser && (
         <JellyfinBrowser
-          onAdd={(video) => {
-            onAddVideo(video);
-            setShowBrowser(false);
-          }}
+          onAdd={(video) => { onAddVideo(video); setShowBrowser(false); }}
           onClose={() => setShowBrowser(false)}
         />
       )}
     </div>
   );
+}
+
+const miniBtn: React.CSSProperties = {
+  width: 28, height: 28, borderRadius: 8,
+  border: '1px solid var(--border)', background: 'var(--surface)',
+  color: 'var(--text-dim)', display: 'grid', placeItems: 'center',
+};
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }

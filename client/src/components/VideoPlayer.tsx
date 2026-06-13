@@ -211,7 +211,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
 
   if (!streamUrl) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-black text-gray-500">
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', color: 'var(--text-faint)', fontSize: 15, fontWeight: 600 }}>
         No video selected
       </div>
     );
@@ -220,14 +220,14 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full bg-black"
+      style={{ position: 'relative', width: '100%', height: '100%', background: '#000' }}
       onMouseMove={resetHideTimer}
       onMouseEnter={resetHideTimer}
       onMouseLeave={() => isPlaying && setControlsVisible(false)}
     >
       <video
         ref={videoRef}
-        className="w-full h-full"
+        style={{ width: '100%', height: '100%' }}
         onClick={handlePlayPause}
         onError={(e) => {
           const code = (e.target as HTMLVideoElement).error?.code;
@@ -237,73 +237,95 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
 
       {/* Controls overlay */}
       <div
-        className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-4 pt-10 pb-3 transition-opacity duration-200 select-none ${
-          showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          padding: '48px 18px 16px',
+          background: 'linear-gradient(transparent, rgba(8,5,3,.82))',
+          opacity: showControls ? 1 : 0,
+          pointerEvents: showControls ? undefined : 'none',
+          transition: 'opacity .2s',
+          userSelect: 'none',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}
       >
         {/* Seek bar */}
         <div
-          className={`w-full h-1 bg-white/25 rounded-full mb-3 relative group/seek ${
-            isHost ? 'cursor-pointer hover:h-1.5 transition-all' : 'cursor-default'
-          }`}
           onClick={handleSeekClick}
+          style={{
+            width: '100%', height: 6, borderRadius: 99,
+            background: 'rgba(255,255,255,.24)', position: 'relative',
+            cursor: isHost ? 'pointer' : 'default',
+          }}
         >
-          <div
-            className="h-full bg-indigo-500 rounded-full pointer-events-none"
-            style={{ width: `${progress}%` }}
-          />
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 99,
+            width: `${progress}%`, background: 'var(--accent)',
+          }} />
           {isHost && (
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover/seek:opacity-100 -translate-x-1/2 transition-opacity pointer-events-none"
-              style={{ left: `${progress}%` }}
-            />
+            <div style={{
+              position: 'absolute', top: '50%', left: `${progress}%`,
+              width: 14, height: 14, borderRadius: '50%', background: '#fff',
+              transform: 'translate(-50%, -50%)',
+              boxShadow: '0 2px 6px rgba(0,0,0,.4)',
+            }} />
           )}
         </div>
 
         {/* Button row */}
-        <div className="flex items-center gap-3">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: '#fff' }}>
           {/* Play / Pause */}
           <button
             onClick={handlePlayPause}
             disabled={!isHost}
             title={isHost ? undefined : 'Only the host can control playback'}
-            className="text-white disabled:opacity-30 disabled:cursor-not-allowed hover:text-indigo-300 transition-colors flex-shrink-0"
+            style={{ background: 'none', border: 'none', color: '#fff', padding: 4, opacity: isHost ? 1 : 0.3, display: 'grid', placeItems: 'center', flexShrink: 0 }}
           >
             {isPlaying ? (
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="5" width="4" height="14" rx="1.5" /><rect x="14" y="5" width="4" height="14" rx="1.5" />
               </svg>
             ) : (
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4" />
               </svg>
             )}
           </button>
 
           {/* Timestamp */}
-          <span className="text-white/80 text-xs tabular-nums flex-shrink-0">
-            {formatTime(currentTime)}{duration > 0 ? ` / ${formatTime(duration)}` : ''}
+          <span style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'rgba(255,255,255,.9)', flexShrink: 0 }}>
+            {formatTime(currentTime)}
+            {duration > 0 && <span style={{ color: 'rgba(255,255,255,.5)' }}> / {formatTime(duration)}</span>}
           </span>
 
-          <div className="flex-1" />
+          <div style={{ flex: 1 }} />
+
+          {/* Host indicator */}
+          {isHost && (
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,.7)', display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Host controls
+            </span>
+          )}
 
           {/* Mute + volume */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={toggleMute}
-              className="text-white hover:text-indigo-300 transition-colors flex-shrink-0"
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button onClick={toggleMute} style={{ background: 'none', border: 'none', color: '#fff', padding: 4, display: 'grid', placeItems: 'center' }}>
               {muted || volume === 0 ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5 6 9H2v6h4l5 4V5Z" fill="currentColor" stroke="none" />
+                  <line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
                 </svg>
               ) : volume < 0.5 ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
                 </svg>
               ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
                 </svg>
               )}
             </button>
@@ -314,28 +336,44 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
               step="0.02"
               value={muted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="w-20 accent-indigo-500 cursor-pointer"
+              style={{ width: 80, cursor: 'pointer', accentColor: 'var(--accent)' }}
             />
           </div>
 
           {/* Fullscreen */}
-          <button
-            onClick={toggleFullscreen}
-            className="text-white hover:text-indigo-300 transition-colors flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+          <button onClick={toggleFullscreen} style={{ background: 'none', border: 'none', color: '#fff', padding: 4, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+              <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
             </svg>
           </button>
         </div>
       </div>
 
+      {/* Sync pill */}
+      <div style={{
+        position: 'absolute', top: 16, left: 16,
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '7px 13px', borderRadius: 99,
+        background: 'rgba(10,7,5,.5)', backdropFilter: 'blur(8px)',
+        color: '#fff', fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap',
+        opacity: showControls ? 1 : 0, transition: 'opacity .2s',
+        pointerEvents: 'none',
+      }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: 'var(--online)',
+          animation: 'blink 2s infinite',
+        }} />
+        {isPlaying ? 'In sync' : 'Paused'}
+      </div>
+
       {streamError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6 pointer-events-none">
-          <div className="text-center space-y-2">
-            <p className="text-red-400 font-medium">Playback error</p>
-            <p className="text-gray-300 text-sm">{streamError}</p>
-            <p className="text-gray-500 text-xs">Check the server terminal and browser console for details.</p>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', padding: 24, pointerEvents: 'none' }}>
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ color: '#f87171', fontWeight: 700, marginBottom: 6 }}>Playback error</p>
+            <p style={{ color: 'rgba(255,255,255,.7)', fontSize: 14, marginBottom: 4 }}>{streamError}</p>
+            <p style={{ color: 'rgba(255,255,255,.35)', fontSize: 12 }}>Check the server terminal and browser console for details.</p>
           </div>
         </div>
       )}

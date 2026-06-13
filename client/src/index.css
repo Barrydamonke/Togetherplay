@@ -2,13 +2,140 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent: #ff7a52;
+  --accent-soft: color-mix(in oklab, var(--accent) 16%, transparent);
+  --accent-ink: #2a1408;
+  --font-display: 'Fredoka', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='dark'] {
+  --bg: #16110e;
+  --bg-grad-a: #1c1511;
+  --bg-grad-b: #120d0a;
+  --surface: #221a15;
+  --surface-2: #2c221c;
+  --surface-3: #372b23;
+  --border: #3a2d24;
+  --border-soft: #2e231c;
+  --text: #f4ebe2;
+  --text-dim: #bcab9d;
+  --text-faint: #8a7a6c;
+  --online: #6fcf8e;
+  --scrim: rgba(10, 7, 5, 0.66);
+}
+
+[data-theme='light'] {
+  --bg: #f4ece0;
+  --bg-grad-a: #fbf5ec;
+  --bg-grad-b: #efe4d4;
+  --surface: #fffdf9;
+  --surface-2: #f6ede0;
+  --surface-3: #efe3d2;
+  --border: #e6d8c5;
+  --border-soft: #efe5d6;
+  --text: #2f2620;
+  --text-dim: #6e6053;
+  --text-faint: #9d8d7c;
+  --online: #3aa564;
+  --scrim: rgba(40, 28, 18, 0.42);
+  --shadow: 0 18px 40px -24px rgba(120, 86, 48, 0.4);
+  --accent-ink: #fff;
+}
+
+/* Paint canvas on <html> — higher specificity beats any resets */
+html[data-theme] {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1200px 800px at 78% -10%, var(--bg-grad-a), transparent 60%),
+    radial-gradient(900px 700px at 0% 110%, var(--bg-grad-b), transparent 55%);
+}
+
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
+  height: 100%;
   margin: 0;
-  background: #111827;
-  color: #f9fafb;
-  font-family: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Scrollbars */
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+input {
+  font-family: inherit;
+}
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Entrance animations — transform-only so content stays visible if timeline pauses */
+@keyframes floatUp {
+  from { transform: translateY(16px); }
+  to { transform: none; }
+}
+@keyframes popIn {
+  from { transform: scale(0.97); }
+  to { transform: none; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-float-up {
+    animation: floatUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .animate-pop-in {
+    animation: popIn 0.35s ease both;
+  }
 }

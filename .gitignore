@@ -26,3 +26,6 @@ Thumbs.db
 
 # Uploads (temporary video files)
 server/uploads/
+
+# Claude Code instructions (local only)
+CLAUDE.md

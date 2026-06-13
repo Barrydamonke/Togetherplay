@@ -4,15 +4,18 @@ import { getSocket } from '../lib/socket';
 import { VideoPlayer } from './VideoPlayer';
 import { Chat } from './Chat';
 import { Sidebar } from './Sidebar';
+import { Icon } from './Icon';
 
 interface Props {
   initialRoom: RoomType;
   isHost: boolean;
   memberId: string;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
   onLeave: () => void;
 }
 
-export function Room({ initialRoom, isHost, memberId, onLeave }: Props) {
+export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLeave }: Props) {
   const [room, setRoom] = useState<RoomType>(initialRoom);
   const socket = getSocket();
 
@@ -29,7 +32,7 @@ export function Room({ initialRoom, isHost, memberId, onLeave }: Props) {
       'queue:update',
       ({ queue, currentVideoIndex }: { queue: Video[]; currentVideoIndex: number }) => {
         setRoom((prev) => ({ ...prev, queue, currentVideoIndex }));
-      }
+      },
     );
 
     socket.on('chat:message', ({ message }: { message: ChatMessage }) => {
@@ -47,10 +50,10 @@ export function Room({ initialRoom, isHost, memberId, onLeave }: Props) {
   const currentVideo = room.currentVideoIndex >= 0 ? room.queue[room.currentVideoIndex] : null;
 
   return (
-    <div className="flex h-screen bg-gray-900 overflow-hidden">
-      {/* Video area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex-1 bg-black">
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      {/* Video side */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, minHeight: 0, background: '#000' }}>
           <VideoPlayer
             streamUrl={currentVideo?.streamUrl ?? null}
             isHls={currentVideo?.isHls ?? true}
@@ -62,24 +65,83 @@ export function Room({ initialRoom, isHost, memberId, onLeave }: Props) {
             onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
           />
         </div>
+
+        {/* Info bar below player */}
         {currentVideo && (
-          <div className="px-4 py-2 bg-gray-900 border-t border-gray-800">
-            <p className="text-sm text-white font-medium truncate">{currentVideo.title}</p>
+          <div style={{
+            padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
+            borderTop: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0,
+          }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="font-display" style={{ fontWeight: 600, fontSize: 17, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
+                {currentVideo.title}
+              </div>
+            </div>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              fontSize: 13, fontWeight: 700, color: 'var(--text-dim)',
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              padding: '8px 13px', borderRadius: 99, flexShrink: 0,
+            }}>
+              <Icon name="heart" size={15} style={{ color: 'var(--accent)' }} /> Loving this
+            </span>
           </div>
         )}
       </div>
 
       {/* Right panel */}
-      <div className="w-72 flex flex-col border-l border-gray-700 bg-gray-900">
-        {/* Leave button */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700">
-          <span className="text-sm font-semibold text-white">Togetherness</span>
-          <button
-            onClick={onLeave}
-            className="text-xs text-gray-500 hover:text-red-400 transition-colors"
-          >
-            Leave
-          </button>
+      <aside style={{
+        width: 332, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        borderLeft: '1px solid var(--border)', background: 'var(--surface)',
+      }}>
+        {/* Panel header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+        }}>
+          {/* Wordmark */}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+            <span style={{
+              width: 22, height: 22, borderRadius: '32% 32% 38% 38%',
+              background: 'linear-gradient(150deg, var(--accent), color-mix(in oklab, var(--accent) 60%, #7d3552))',
+              display: 'grid', placeItems: 'center', color: 'var(--accent-ink)', flexShrink: 0,
+              boxShadow: '0 4px 10px -4px var(--accent)',
+            }}>
+              <Icon name="play" size={11} />
+            </span>
+            <span className="font-display" style={{ fontWeight: 600, fontSize: 15, letterSpacing: '-.01em', color: 'var(--text)' }}>
+              Togetherness
+            </span>
+          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Theme toggle */}
+            <button
+              onClick={onToggleTheme}
+              title="Toggle theme"
+              style={{
+                width: 32, height: 32, borderRadius: '50%',
+                border: '1px solid var(--border)', background: 'var(--surface-2)',
+                color: 'var(--text-dim)', display: 'grid', placeItems: 'center',
+              }}
+            >
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
+            </button>
+
+            {/* Leave */}
+            <button
+              onClick={onLeave}
+              title="Leave room"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontSize: 13, fontWeight: 700, color: 'var(--text-dim)',
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+                padding: '7px 12px', borderRadius: 99,
+              }}
+            >
+              <Icon name="door" size={15} /> Leave
+            </button>
+          </div>
         </div>
 
         <Sidebar
@@ -95,7 +157,7 @@ export function Room({ initialRoom, isHost, memberId, onLeave }: Props) {
           currentMemberId={memberId}
           onSend={(text) => socket.emit('chat:message', { text })}
         />
-      </div>
+      </aside>
     </div>
   );
 }
