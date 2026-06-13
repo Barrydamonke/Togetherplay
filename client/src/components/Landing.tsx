@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 import { Room } from '../types';
 import { Icon } from './Icon';
+import { AdminPanel } from './AdminPanel';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -24,7 +25,6 @@ const FALLBACK_TAGLINES = [
 ];
 
 const SOCIAL_COLORS = ['#6fae8e', '#5e6fb5', '#d98b9e'];
-const SOCIAL_NAMES  = ['P', 'M', 'J'];
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -35,45 +35,135 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function FloatingPosters() {
+const ENTRY_TRANSFORMS: Record<string, string> = {
+  left:   'translateX(-115vw)',
+  right:  'translateX(115vw)',
+  top:    'translateY(-115vh)',
+  bottom: 'translateY(115vh)',
+};
+
+interface SlidingPoster {
+  key: string;
+  itemId: string;
+  name: string;
+  x: string;
+  y: string;
+  w: number;
+  rot: number;
+  dir: string;
+  visible: boolean;
+}
+
+function PosterCard({ itemId, name, bg }: { itemId?: string; name: string; bg: string }) {
+  return (
+    <div style={{ width: '100%', height: '100%', borderRadius: 16, overflow: 'hidden', position: 'relative', background: bg }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 80% at 80% 0%, rgba(255,255,255,.22), transparent 55%)' }} />
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '8%' }}>
+        <div className="font-display" style={{ fontWeight: 600, color: '#fff', lineHeight: 1.05, fontSize: 'clamp(9px,18%,15px)', textShadow: '0 1px 6px rgba(0,0,0,.4)' }}>
+          {name}
+        </div>
+      </div>
+      {itemId && (
+        <img
+          src={`/api/jellyfin/thumbnail/${itemId}`}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FloatingPosters({ taglineCount }: { taglineCount: number }) {
+  const [items, setItems] = useState<Array<{ Id: string; Name: string }>>([]);
+  const [extras, setExtras] = useState<SlidingPoster[]>([]);
+  const deckRef = useRef<Array<{ Id: string; Name: string }>>([]);
+
+  useEffect(() => {
+    deckRef.current = shuffle([...items]);
+  }, [items]);
+
+  useEffect(() => {
+    fetch('/api/jellyfin/random-posters')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data: { Items: Array<{ Id: string; Name: string }> }) => {
+        if (Array.isArray(data.Items)) setItems(data.Items);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (taglineCount === 0 || items.length === 0) return;
+    if (deckRef.current.length === 0) deckRef.current = shuffle([...items]);
+    const item = deckRef.current.pop()!;
+    const dirs = ['left', 'right', 'top', 'bottom'];
+    const dir = dirs[Math.floor(Math.random() * dirs.length)];
+    const key = `slide-${taglineCount}`;
+
+    const next: SlidingPoster = {
+      key,
+      itemId: item.Id,
+      name: item.Name,
+      x: `${4 + Math.random() * 84}%`,
+      y: `${4 + Math.random() * 72}%`,
+      w: 108 + Math.floor(Math.random() * 44),
+      rot: (Math.random() - 0.5) * 20,
+      dir,
+      visible: false,
+    };
+
+    setExtras((prev) => [...prev.slice(-11), next]);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setExtras((prev) => prev.map((p) => (p.key === key ? { ...p, visible: true } : p)));
+      });
+    });
+  }, [taglineCount]);
+
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      {POSTERS.map((p, i) => (
+      {/* Fixed background posters */}
+      {POSTERS.map((p, i) => {
+        const item = items[i];
+        return (
+          <div
+            key={i}
+            className="animate-float-up"
+            style={{
+              position: 'absolute', left: p.x, top: p.y, width: p.w,
+              aspectRatio: '2/3', transform: `rotate(${p.rot}deg)`,
+              opacity: 0.9, filter: 'drop-shadow(0 24px 40px rgba(0,0,0,.32))',
+              animationDelay: p.delay,
+            }}
+          >
+            <PosterCard itemId={item?.Id} name={item?.Name ?? p.title} bg={`linear-gradient(150deg, ${p.g[0]}, ${p.g[1]})`} />
+          </div>
+        );
+      })}
+
+      {/* Sliding-in posters triggered by tagline cycles */}
+      {extras.map((p) => (
         <div
-          key={i}
-          className="animate-float-up"
+          key={p.key}
           style={{
-            position: 'absolute',
-            left: p.x,
-            top: p.y,
-            width: p.w,
+            position: 'absolute', left: p.x, top: p.y, width: p.w,
             aspectRatio: '2/3',
-            transform: `rotate(${p.rot}deg)`,
-            opacity: 0.9,
+            opacity: p.visible ? 0.82 : 0,
+            transform: `rotate(${p.rot}deg)${p.visible ? '' : ` ${ENTRY_TRANSFORMS[p.dir]}`}`,
+            transition: 'transform 1.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 1s ease',
             filter: 'drop-shadow(0 24px 40px rgba(0,0,0,.32))',
-            animationDelay: p.delay,
           }}
         >
-          <div style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 16,
-            overflow: 'hidden',
-            position: 'relative',
-            background: `linear-gradient(150deg, ${p.g[0]}, ${p.g[1]})`,
-          }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 80% at 80% 0%, rgba(255,255,255,.22), transparent 55%)' }} />
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '8%' }}>
-              <div className="font-display" style={{ fontWeight: 600, color: '#fff', lineHeight: 1.05, fontSize: 'clamp(9px,18%,15px)', textShadow: '0 1px 6px rgba(0,0,0,.4)' }}>{p.title}</div>
-            </div>
-          </div>
+          <PosterCard itemId={p.itemId} name={p.name} bg="linear-gradient(150deg, #4a4540, #2a211c)" />
         </div>
       ))}
     </div>
   );
 }
 
-function RotatingBadge() {
+function RotatingBadge({ onCycle }: { onCycle?: () => void }) {
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const [messages, setMessages] = useState<string[]>(FALLBACK_TAGLINES);
   const [idx, setIdx] = useState(0);
@@ -97,10 +187,14 @@ function RotatingBadge() {
     if (reduced || messages.length < 2) return;
     const id = setInterval(() => {
       setShow(false);
-      setTimeout(() => { setIdx((v) => (v + 1) % messages.length); setShow(true); }, 320);
+      setTimeout(() => {
+        setIdx((v) => (v + 1) % messages.length);
+        setShow(true);
+        onCycle?.();
+      }, 320);
     }, 3600);
     return () => clearInterval(id);
-  }, [reduced, messages]);
+  }, [reduced, messages, onCycle]);
 
   return (
     <div style={{
@@ -124,6 +218,21 @@ function RotatingBadge() {
 }
 
 function WatchingNow() {
+  const [names, setNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    const handler = ({ memberNames }: { membersOnline: number; memberNames: string[] }) =>
+      setNames(memberNames);
+    socket.on('server:stats', handler);
+    return () => { socket.off('server:stats', handler); };
+  }, []);
+
+  if (names.length === 0) return null;
+
+  const shown = names.slice(0, 3);
+  const label = names.length === 1 ? '1 person' : `${names.length} friends`;
+
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: 10,
@@ -131,19 +240,19 @@ function WatchingNow() {
       background: 'var(--surface)', border: '1px solid var(--border)',
     }}>
       <div style={{ display: 'flex' }}>
-        {SOCIAL_NAMES.map((name, i) => (
-          <span key={i} style={{
+        {shown.map((name, i) => (
+          <span key={i} title={name} style={{
             width: 26, height: 26, borderRadius: '50%',
-            background: SOCIAL_COLORS[i], color: '#fff',
+            background: SOCIAL_COLORS[i % SOCIAL_COLORS.length], color: '#fff',
             display: 'grid', placeItems: 'center',
             fontWeight: 800, fontSize: 11,
             border: '2px solid var(--surface)',
             marginLeft: i ? -9 : 0,
-          }}>{name}</span>
+          }}>{name[0].toUpperCase()}</span>
         ))}
       </div>
       <span style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-        <strong style={{ color: 'var(--text)' }}>3 friends</strong> watching right now
+        <strong style={{ color: 'var(--text)' }}>{label}</strong> watching right now
       </span>
     </div>
   );
@@ -211,6 +320,8 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [taglineCount, setTaglineCount] = useState(0);
 
   function submit() {
     const trimmed = username.trim();
@@ -244,7 +355,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      <FloatingPosters />
+      <FloatingPosters taglineCount={taglineCount} />
 
       <header style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 28px' }}>
         {/* Wordmark */}
@@ -262,21 +373,32 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
           </span>
         </span>
 
-        {/* Theme toggle */}
-        <button onClick={onToggleTheme} title="Toggle light / dark" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px',
-          borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface)',
-          color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, boxShadow: 'var(--shadow)',
-        }}>
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
-          {theme === 'dark' ? 'Light' : 'Dark'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Admin */}
+          <button onClick={() => setShowAdmin(true)} title="Admin panel" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 13px',
+            borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface)',
+            color: 'var(--text-faint)', fontWeight: 700, fontSize: 13,
+          }}>
+            <Icon name="lock" size={14} /> Admin
+          </button>
+
+          {/* Theme toggle */}
+          <button onClick={onToggleTheme} title="Toggle light / dark" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+            borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface)',
+            color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, boxShadow: 'var(--shadow)',
+          }}>
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
+            {theme === 'dark' ? 'Light' : 'Dark'}
+          </button>
+        </div>
       </header>
 
       <main style={{ position: 'relative', flex: 1, display: 'grid', placeItems: 'center', padding: '12px 20px 56px' }}>
         {mode === 'choose' ? (
           <div className="animate-float-up" style={{ textAlign: 'center', maxWidth: 540 }}>
-            <RotatingBadge />
+            <RotatingBadge onCycle={() => setTaglineCount((c) => c + 1)} />
             <h1 className="font-display" style={{
               fontSize: 'clamp(40px, 6vw, 62px)', fontWeight: 600,
               lineHeight: 1.02, letterSpacing: '-.02em', margin: '0 0 16px',
@@ -374,6 +496,8 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
       <footer style={{ position: 'relative', textAlign: 'center', padding: '0 20px 22px', color: 'var(--text-faint)', fontSize: 13, fontWeight: 600 }}>
         Plays anything from your own server · everyone stays in sync to the millisecond
       </footer>
+
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </div>
   );
 }

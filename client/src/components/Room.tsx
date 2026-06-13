@@ -63,6 +63,12 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
             onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
             onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
             onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
+            onEnded={() => {
+              const nextIndex = room.currentVideoIndex + 1;
+              if (nextIndex < room.queue.length) {
+                socket.emit('queue:set_current', { index: nextIndex });
+              }
+            }}
           />
         </div>
 

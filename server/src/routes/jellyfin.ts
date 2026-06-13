@@ -1,14 +1,12 @@
 import { Router, Request, Response } from 'express';
+import { getConfig } from '../config';
 
 const router = Router();
 
-const JELLYFIN_URL = process.env.JELLYFIN_URL ?? '';
-const JELLYFIN_API_KEY = process.env.JELLYFIN_API_KEY ?? '';
-const JELLYFIN_USER_ID = process.env.JELLYFIN_USER_ID ?? '';
-
 async function jellyfinFetch(path: string): Promise<unknown> {
-  const res = await fetch(`${JELLYFIN_URL}${path}`, {
-    headers: { 'X-Emby-Token': JELLYFIN_API_KEY },
+  const { jellyfinUrl, jellyfinApiKey } = getConfig();
+  const res = await fetch(`${jellyfinUrl}${path}`, {
+    headers: { 'X-Emby-Token': jellyfinApiKey },
   });
   if (!res.ok) throw new Error(`Jellyfin responded with ${res.status}`);
   return res.json();
@@ -17,9 +15,10 @@ async function jellyfinFetch(path: string): Promise<unknown> {
 // Browse library items — used by the host's Jellyfin browser modal.
 router.get('/items', async (req: Request, res: Response) => {
   try {
+    const { jellyfinUserId } = getConfig();
     const { parentId, search, limit = '50', startIndex = '0' } = req.query;
     let path =
-      `/Users/${JELLYFIN_USER_ID}/Items` +
+      `/Users/${jellyfinUserId}/Items` +
       `?IncludeItemTypes=Movie,Episode,Video,Folder,CollectionFolder,Series,Season` +
       `&Recursive=false` +
       `&Fields=Overview,RunTimeTicks,PrimaryImageAspectRatio,Type` +
@@ -41,15 +40,16 @@ router.get('/items', async (req: Request, res: Response) => {
 // Fetches the proper MediaSourceId first; falls back to direct stream for browser-native formats.
 router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
   const { itemId } = req.params;
+  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId } = getConfig();
 
-  if (!JELLYFIN_URL) {
-    res.status(500).json({ error: 'JELLYFIN_URL is not set in environment.' });
+  if (!jellyfinUrl) {
+    res.status(500).json({ error: 'Jellyfin URL is not configured. Set it in the admin panel.' });
     return;
   }
 
   try {
     const item = await jellyfinFetch(
-      `/Users/${JELLYFIN_USER_ID}/Items/${itemId}?Fields=MediaSources`
+      `/Users/${jellyfinUserId}/Items/${itemId}?Fields=MediaSources`
     ) as {
       MediaSources?: Array<{
         Id: string;
@@ -67,16 +67,16 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
 
     if (source?.SupportsDirectStream) {
       streamUrl =
-        `${JELLYFIN_URL}/Videos/${itemId}/stream` +
+        `${jellyfinUrl}/Videos/${itemId}/stream` +
         `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` +
-        `&api_key=${JELLYFIN_API_KEY}&Static=true`;
+        `&api_key=${jellyfinApiKey}&Static=true`;
       isHls = false;
     } else {
       const tag = source?.ETag ? `&Tag=${encodeURIComponent(source.ETag)}` : '';
       streamUrl =
-        `${JELLYFIN_URL}/Videos/${itemId}/master.m3u8` +
+        `${jellyfinUrl}/Videos/${itemId}/master.m3u8` +
         `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` +
-        `&api_key=${JELLYFIN_API_KEY}${tag}`;
+        `&api_key=${jellyfinApiKey}${tag}`;
       isHls = true;
     }
 
@@ -88,14 +88,43 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
   }
 });
 
+// Returns a random sample of items with poster images for the landing page background.
+router.get('/random-posters', async (_req: Request, res: Response) => {
+  const { jellyfinUserId } = getConfig();
+  if (!jellyfinUserId) {
+    res.json({ Items: [] });
+    return;
+  }
+  try {
+    const data = await jellyfinFetch(
+      `/Users/${jellyfinUserId}/Items` +
+      `?IncludeItemTypes=Movie,Series` +
+      `&Recursive=true` +
+      `&Fields=PrimaryImageAspectRatio` +
+      `&Limit=100` +
+      `&SortBy=SortName&SortOrder=Ascending`,
+    ) as { Items?: Array<{ Id: string; Name: string; PrimaryImageAspectRatio?: number }> };
+
+    const withPosters = (data.Items ?? []).filter((i) => i.PrimaryImageAspectRatio);
+    for (let k = withPosters.length - 1; k > 0; k--) {
+      const j = Math.floor(Math.random() * (k + 1));
+      [withPosters[k], withPosters[j]] = [withPosters[j], withPosters[k]];
+    }
+    res.json({ Items: withPosters.slice(0, 8) });
+  } catch {
+    res.json({ Items: [] });
+  }
+});
+
 // Proxy thumbnails so Jellyfin credentials stay server-side.
 router.get('/thumbnail/:itemId', async (req: Request, res: Response) => {
   const { itemId } = req.params;
   const { maxWidth = '400' } = req.query;
+  const { jellyfinUrl, jellyfinApiKey } = getConfig();
   try {
     const imageRes = await fetch(
-      `${JELLYFIN_URL}/Items/${itemId}/Images/Primary?MaxWidth=${maxWidth}`,
-      { headers: { 'X-Emby-Token': JELLYFIN_API_KEY } }
+      `${jellyfinUrl}/Items/${itemId}/Images/Primary?MaxWidth=${maxWidth}`,
+      { headers: { 'X-Emby-Token': jellyfinApiKey } }
     );
     if (!imageRes.ok) {
       res.status(404).send('Not found');

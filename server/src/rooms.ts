@@ -57,6 +57,14 @@ export function leaveRoom(pin: string, memberId: string): Room | null {
   return room;
 }
 
+export function getOnlineStats(): { membersOnline: number; memberNames: string[] } {
+  const names: string[] = [];
+  for (const room of rooms.values()) {
+    for (const member of room.members) names.push(member.username);
+  }
+  return { membersOnline: names.length, memberNames: names };
+}
+
 // Calculates where the video currently is, accounting for time elapsed since last sync.
 export function getCurrentTimestamp(room: Room): number {
   if (!room.playback.playing) return room.playback.timestamp;

@@ -11,6 +11,7 @@ interface Props {
   onPlay: (timestamp: number) => void;
   onPause: (timestamp: number) => void;
   onSeek: (timestamp: number) => void;
+  onEnded?: () => void;
 }
 
 const SYNC_TOLERANCE_SECONDS = 2;
@@ -24,7 +25,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, isHost, onPlay, onPause, onSeek }: Props) {
+export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, isHost, onPlay, onPause, onSeek, onEnded }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRef = useRef(false);
@@ -38,6 +39,16 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
   const [muted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  // Refs so event listeners (set up with [streamUrl] dep) always see current values.
+  const playbackRef = useRef(playback);
+  const isHostRef = useRef(isHost);
+  const onEndedRef = useRef(onEnded);
+  useEffect(() => { playbackRef.current = playback; }, [playback]);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+  useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
 
   // Seed duration from Jellyfin metadata whenever the video changes.
   // This fires immediately so the seek bar is usable before loadedmetadata resolves.
@@ -51,6 +62,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
     if (!video || !streamUrl) return;
 
     setStreamError('');
+    setIsBuffering(true);
     hlsRef.current?.destroy();
     hlsRef.current = null;
     video.src = '';
@@ -128,19 +140,32 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
     const onSeeked = () => setCurrentTime(video.currentTime);
     const onLoadedMetadata = () => readDuration();
     const onDurationChange = () => readDuration();
-    const onCanPlay = () => readDuration();
+    const onCanPlay = () => {
+      readDuration();
+      setIsBuffering(false);
+      // Retry play if the sync effect fired before the stream was ready.
+      if (playbackRef.current.playing && video.paused) {
+        video.play().catch(() => {});
+      }
+    };
+    const onWaiting = () => setIsBuffering(true);
     const onVolumeChange = () => { setVolume(video.volume); setMuted(video.muted); };
-    const onPlayEvt = () => setIsPlaying(true);
+    const onPlayEvt = () => { setIsPlaying(true); setIsBuffering(false); };
     const onPauseEvt = () => setIsPlaying(false);
+    const onEndedEvt = () => {
+      if (isHostRef.current) onEndedRef.current?.();
+    };
 
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('seeked', onSeeked);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('durationchange', onDurationChange);
     video.addEventListener('canplay', onCanPlay);
+    video.addEventListener('waiting', onWaiting);
     video.addEventListener('volumechange', onVolumeChange);
     video.addEventListener('play', onPlayEvt);
     video.addEventListener('pause', onPauseEvt);
+    video.addEventListener('ended', onEndedEvt);
 
     return () => {
       video.removeEventListener('timeupdate', onTimeUpdate);
@@ -148,9 +173,11 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('durationchange', onDurationChange);
       video.removeEventListener('canplay', onCanPlay);
+      video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('volumechange', onVolumeChange);
       video.removeEventListener('play', onPlayEvt);
       video.removeEventListener('pause', onPauseEvt);
+      video.removeEventListener('ended', onEndedEvt);
     };
   }, [streamUrl]);
 
@@ -164,6 +191,12 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
   }, []);
 
   useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   // Controls
 
@@ -341,14 +374,34 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
           </div>
 
           {/* Fullscreen */}
-          <button onClick={toggleFullscreen} style={{ background: 'none', border: 'none', color: '#fff', padding: 4, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
-              <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
-            </svg>
+          <button onClick={toggleFullscreen} title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} style={{ background: 'none', border: 'none', color: '#fff', padding: 4, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+            {isFullscreen ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+                <path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+              </svg>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Buffering spinner */}
+      {isBuffering && (
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none',
+        }}>
+          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" style={{ animation: 'spin 0.75s linear infinite' }}>
+            <circle cx="26" cy="26" r="22" stroke="rgba(255,255,255,0.18)" strokeWidth="4" />
+            <path d="M48 26a22 22 0 0 0-22-22" stroke="white" strokeWidth="4" strokeLinecap="round" />
+          </svg>
+        </div>
+      )}
 
       {/* Sync pill */}
       <div style={{

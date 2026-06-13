@@ -1,17 +1,20 @@
 import { Server, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
-import { createRoom, getRoom, joinRoom, leaveRoom, getCurrentTimestamp } from './rooms';
+import { createRoom, getRoom, joinRoom, leaveRoom, getCurrentTimestamp, getOnlineStats } from './rooms';
 import { Video, ChatMessage } from './types';
 
 export function setupSocket(io: Server): void {
   io.on('connection', (socket: Socket) => {
     let currentPin: string | null = null;
 
+    socket.emit('server:stats', getOnlineStats());
+
     socket.on('room:create', ({ username }: { username: string }) => {
       const room = createRoom(socket.id, username);
       currentPin = room.pin;
       socket.join(room.pin);
       socket.emit('room:joined', { room, isHost: true });
+      io.emit('server:stats', getOnlineStats());
     });
 
     socket.on('room:join', ({ pin, username }: { pin: string; username: string }) => {
@@ -35,6 +38,7 @@ export function setupSocket(io: Server): void {
 
       socket.emit('room:joined', { room: syncedRoom, isHost: false });
       socket.to(pin).emit('room:members_updated', { members: room.members });
+      io.emit('server:stats', getOnlineStats());
     });
 
     socket.on('playback:play', ({ timestamp }: { timestamp: number }) => {
@@ -65,8 +69,13 @@ export function setupSocket(io: Server): void {
       if (!currentPin) return;
       const room = getRoom(currentPin);
       if (!room || room.hostId !== socket.id) return;
+      const wasEmpty = room.currentVideoIndex === -1;
       room.queue.push(video);
-      if (room.currentVideoIndex === -1) room.currentVideoIndex = 0;
+      if (wasEmpty) {
+        room.currentVideoIndex = 0;
+        room.playback = { playing: true, timestamp: 0, lastSyncedAt: Date.now() };
+        io.to(currentPin).emit('playback:update', { playback: room.playback });
+      }
       io.to(currentPin).emit('queue:update', {
         queue: room.queue,
         currentVideoIndex: room.currentVideoIndex,
@@ -93,7 +102,7 @@ export function setupSocket(io: Server): void {
       const room = getRoom(currentPin);
       if (!room || room.hostId !== socket.id) return;
       room.currentVideoIndex = index;
-      room.playback = { playing: false, timestamp: 0, lastSyncedAt: Date.now() };
+      room.playback = { playing: true, timestamp: 0, lastSyncedAt: Date.now() };
       io.to(currentPin).emit('queue:update', {
         queue: room.queue,
         currentVideoIndex: room.currentVideoIndex,
@@ -137,6 +146,7 @@ export function setupSocket(io: Server): void {
       if (room) {
         io.to(currentPin).emit('room:members_updated', { members: room.members });
       }
+      io.emit('server:stats', getOnlineStats());
     });
   });
 }

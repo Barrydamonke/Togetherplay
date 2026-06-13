@@ -12,6 +12,9 @@ server/dist/
 .env.local
 .env.*.local
 
+# Admin panel config (contains secrets — set via admin panel, not committed)
+server/config.json
+
 # Logs
 logs/
 *.log
