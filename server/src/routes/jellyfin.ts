@@ -106,16 +106,12 @@ router.get('/random-posters', async (_req: Request, res: Response) => {
       `?IncludeItemTypes=Movie,Series` +
       `&Recursive=true` +
       `&Fields=PrimaryImageAspectRatio` +
-      `&Limit=100` +
-      `&SortBy=SortName&SortOrder=Ascending`,
+      `&Limit=500` +
+      `&SortBy=Random`,
     ) as { Items?: Array<{ Id: string; Name: string; PrimaryImageAspectRatio?: number }> };
 
     const withPosters = (data.Items ?? []).filter((i) => i.PrimaryImageAspectRatio);
-    for (let k = withPosters.length - 1; k > 0; k--) {
-      const j = Math.floor(Math.random() * (k + 1));
-      [withPosters[k], withPosters[j]] = [withPosters[j], withPosters[k]];
-    }
-    res.json({ Items: withPosters.slice(0, 8) });
+    res.json({ Items: withPosters.slice(0, 50) });
   } catch {
     res.json({ Items: [] });
   }

@@ -3,6 +3,7 @@ import { getSocket } from '../lib/socket';
 import { Room } from '../types';
 import { Icon } from './Icon';
 import { AdminPanel } from './AdminPanel';
+import { ReleaseNotes } from './ReleaseNotes';
 
 const APP_VERSION = '1.0';
 
@@ -14,10 +15,10 @@ interface Props {
 
 // Decorative poster configs for the floating background cards
 const POSTERS = [
-  { title: 'Autumn in Maple Hollow', g: ['#e8a14b', '#b5552e'], x: '7%',  y: '16%', w: 132, rot: -9, delay: '0s'   },
-  { title: 'Midnight Diner Tales',   g: ['#5e6fb5', '#27305e'], x: '15%', y: '52%', w: 116, rot:  7, delay: '.6s'  },
-  { title: 'The Last Bookshop',      g: ['#6fae8e', '#2f5e4c'], x: '80%', y: '13%', w: 124, rot:  8, delay: '.3s'  },
-  { title: 'Snowfall on Cedar St.',  g: ['#7fa6cf', '#3a5b80'], x: '84%', y: '54%', w: 138, rot: -7, delay: '.9s'  },
+  { title: 'Autumn with a Gay Man', g: ['#e8a14b', '#b5552e'], x: '7%',  y: '16%', w: 132, rot: -9, delay: '0s'   },
+  { title: 'My experience with Jeremy',   g: ['#5e6fb5', '#27305e'], x: '15%', y: '52%', w: 116, rot:  7, delay: '.6s'  },
+  { title: 'Five nights at Jeremys',      g: ['#6fae8e', '#2f5e4c'], x: '80%', y: '13%', w: 124, rot:  8, delay: '.3s'  },
+  { title: 'Gloinks: the movie',  g: ['#7fa6cf', '#3a5b80'], x: '84%', y: '54%', w: 138, rot: -7, delay: '.9s'  },
 ];
 
 const FALLBACK_TAGLINES = [
@@ -356,6 +357,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false);
   const [taglineCount, setTaglineCount] = useState(0);
   const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
   const [posterUnlocked, setPosterUnlocked] = useState(false);
@@ -724,14 +726,22 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
       </footer>
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+      {showReleaseNotes && <ReleaseNotes onClose={() => setShowReleaseNotes(false)} />}
 
-      <span style={{
-        position: 'fixed', bottom: 14, left: 18,
-        fontSize: 13, fontWeight: 700, color: 'var(--text-faint)',
-        letterSpacing: '.04em', pointerEvents: 'none', userSelect: 'none',
-      }}>
+      <button
+        onClick={() => setShowReleaseNotes(true)}
+        title="Release notes"
+        style={{
+          position: 'fixed', bottom: 14, left: 18,
+          fontSize: 12, fontWeight: 800, color: 'var(--text-faint)',
+          letterSpacing: '.04em', userSelect: 'none',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          padding: '5px 11px', borderRadius: 99,
+          cursor: 'pointer', boxShadow: 'var(--shadow)',
+        }}
+      >
         v{APP_VERSION}
-      </span>
+      </button>
 
       <button
         onClick={() => setPosterUnlocked((v) => !v)}
