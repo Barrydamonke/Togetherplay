@@ -21,6 +21,13 @@ interface BreadcrumbEntry {
   name: string;
 }
 
+const THUMB_COLORS = ['#ff7a52', '#6fae8e', '#5e6fb5', '#d98b9e', '#c98a52', '#7fa6cf', '#9b6ae0', '#3fae93'];
+function thumbGradient(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return `linear-gradient(150deg, ${THUMB_COLORS[h % THUMB_COLORS.length]}, #1a1a2e)`;
+}
+
 export function JellyfinBrowser({ onAdd, onClose }: Props) {
   const [items, setItems] = useState<JellyfinItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +38,7 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
   ]);
   const [adding, setAdding] = useState<string | null>(null);
   const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
+  const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch('/api/jellyfin/health')
@@ -212,22 +220,39 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
                 key={item.Id}
                 style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 10, borderRadius: 'var(--r-md)' }}
               >
-                <div style={{ position: 'relative', width: 44, height: 62, borderRadius: 8, flexShrink: 0, background: 'var(--surface-3)', overflow: 'hidden' }}>
-                  {browseable && (
+                <div style={{
+                  position: 'relative', width: 44, height: 62, borderRadius: 8, flexShrink: 0, overflow: 'hidden',
+                  background: failedThumbs.has(item.Id) ? thumbGradient(item.Name) : 'var(--surface-3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {failedThumbs.has(item.Id) ? (
                     <span style={{
-                      position: 'absolute', inset: 0,
-                      color: 'var(--text-faint)',
-                      display: 'grid', placeItems: 'center',
+                      fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.9)',
+                      textAlign: 'center', padding: '2px 5px', lineHeight: 1.3,
+                      textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                      wordBreak: 'break-word', overflow: 'hidden', maxHeight: 50, width: '100%',
                     }}>
-                      <Icon name="folder" size={22} />
+                      {item.Name}
                     </span>
+                  ) : (
+                    <>
+                      {browseable && (
+                        <span style={{
+                          position: 'absolute', inset: 0,
+                          color: 'var(--text-faint)',
+                          display: 'grid', placeItems: 'center',
+                        }}>
+                          <Icon name="folder" size={22} />
+                        </span>
+                      )}
+                      <img
+                        src={thumbnailUrl(item.Id)}
+                        alt=""
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={() => setFailedThumbs(prev => new Set(prev).add(item.Id))}
+                      />
+                    </>
                   )}
-                  <img
-                    src={thumbnailUrl(item.Id)}
-                    alt=""
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>

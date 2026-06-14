@@ -4,6 +4,8 @@ import { Room } from '../types';
 import { Icon } from './Icon';
 import { AdminPanel } from './AdminPanel';
 
+const APP_VERSION = '1.0';
+
 interface Props {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
@@ -75,13 +77,20 @@ function PosterCard({ itemId, name, bg }: { itemId?: string; name: string; bg: s
   );
 }
 
-function FloatingPosters({ taglineCount }: { taglineCount: number }) {
+function FloatingPosters({ taglineCount, maxExtras }: { taglineCount: number; maxExtras: number }) {
   const [items, setItems] = useState<Array<{ Id: string; Name: string }>>([]);
   const [extras, setExtras] = useState<SlidingPoster[]>([]);
   const deckRef = useRef<Array<{ Id: string; Name: string }>>([]);
+  const maxExtrasRef = useRef(maxExtras);
+  const extrasRef = useRef<SlidingPoster[]>([]);
+  useEffect(() => { maxExtrasRef.current = maxExtras; }, [maxExtras]);
+  useEffect(() => { extrasRef.current = extras; }, [extras]);
 
+  // Build the sliding-extras deck, excluding the items already pinned to the 4 fixed slots.
   useEffect(() => {
-    deckRef.current = shuffle([...items]);
+    const fixedIds = new Set(items.slice(0, POSTERS.length).map((i) => i.Id));
+    const pool = items.filter((i) => !fixedIds.has(i.Id));
+    deckRef.current = shuffle(pool.length >= 4 ? pool : [...items]);
   }, [items]);
 
   useEffect(() => {
@@ -95,8 +104,21 @@ function FloatingPosters({ taglineCount }: { taglineCount: number }) {
 
   useEffect(() => {
     if (taglineCount === 0 || items.length === 0) return;
-    if (deckRef.current.length === 0) deckRef.current = shuffle([...items]);
-    const item = deckRef.current.pop()!;
+
+    // Rebuild deck when exhausted, still excluding fixed-slot IDs.
+    if (deckRef.current.length === 0) {
+      const fixedIds = new Set(items.slice(0, POSTERS.length).map((i) => i.Id));
+      const pool = items.filter((i) => !fixedIds.has(i.Id));
+      deckRef.current = shuffle(pool.length >= 4 ? pool : [...items]);
+    }
+
+    // Pick the first deck entry whose ID isn't already visible in extras.
+    const visibleIds = new Set(extrasRef.current.map((e) => e.itemId));
+    const pickIdx = deckRef.current.findIndex((i) => !visibleIds.has(i.Id));
+    const item = pickIdx !== -1
+      ? deckRef.current.splice(pickIdx, 1)[0]
+      : deckRef.current.pop()!;
+
     const dirs = ['left', 'right', 'top', 'bottom'];
     const dir = dirs[Math.floor(Math.random() * dirs.length)];
     const key = `slide-${taglineCount}`;
@@ -113,7 +135,10 @@ function FloatingPosters({ taglineCount }: { taglineCount: number }) {
       visible: false,
     };
 
-    setExtras((prev) => [...prev.slice(-11), next]);
+    setExtras((prev) => {
+      if (prev.length >= maxExtrasRef.current) return prev;
+      return [...prev.slice(-(maxExtrasRef.current - 1)), next];
+    });
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -121,6 +146,15 @@ function FloatingPosters({ taglineCount }: { taglineCount: number }) {
       });
     });
   }, [taglineCount]);
+
+  // When maxExtras drops, drain the oldest poster every 400ms until we're within the limit.
+  useEffect(() => {
+    if (extras.length <= maxExtras) return;
+    const timer = setTimeout(() => {
+      setExtras((prev) => prev.slice(1));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [extras.length, maxExtras]);
 
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
@@ -315,14 +349,22 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function Landing({ theme, onToggleTheme, onJoined }: Props) {
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
-  const [username, setUsername] = useState('');
+  const [mode, setMode] = useState<'choose' | 'rooms' | 'create' | 'join'>('choose');
+  const [username, setUsername] = useState(() => localStorage.getItem('tg-username') ?? '');
   const [pin, setPin] = useState('');
+  const [pinRequired, setPinRequired] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [taglineCount, setTaglineCount] = useState(0);
   const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
+  const [posterUnlocked, setPosterUnlocked] = useState(false);
+  const [availableRooms, setAvailableRooms] = useState<Array<{ pin: string; memberCount: number; memberNames: string[] }>>([]);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+
+  useEffect(() => {
+    console.log(`Togetherness v${APP_VERSION}`);
+  }, []);
 
   useEffect(() => {
     fetch('/api/jellyfin/health')
@@ -334,11 +376,44 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
       .catch(() => setJellyfinStatus('unreachable'));
   }, []);
 
+  // Fetch and auto-refresh the room list while the rooms browser is open.
+  useEffect(() => {
+    if (mode !== 'rooms') return;
+    let alive = true;
+    const load = () => {
+      setLoadingRooms(true);
+      fetch('/api/rooms')
+        .then((r) => r.json())
+        .then((data: { rooms: Array<{ pin: string; memberCount: number; memberNames: string[] }> }) => {
+          if (alive) { setAvailableRooms(data.rooms); setLoadingRooms(false); }
+        })
+        .catch(() => { if (alive) setLoadingRooms(false); });
+    };
+    load();
+    const interval = setInterval(load, 5000);
+    return () => { alive = false; clearInterval(interval); };
+  }, [mode]);
+
+  function selectRoom(room: { pin: string; memberCount: number }) {
+    if (room.memberCount === 0) {
+      // Empty room — PIN is known, user just needs to enter their name.
+      setPin(room.pin);
+      setPinRequired(false);
+    } else {
+      // Occupied room — user must type the PIN themselves.
+      setPin('');
+      setPinRequired(true);
+    }
+    setError('');
+    setMode('join');
+  }
+
   function submit() {
     const trimmed = username.trim();
     if (!trimmed) { setError('Tell us your name first 🙂'); return; }
-    if (mode === 'join' && pin.length !== 4) { setError('That PIN needs all 4 digits.'); return; }
+    if (mode === 'join' && pinRequired && pin.length !== 4) { setError('That PIN needs all 4 digits.'); return; }
 
+    localStorage.setItem('tg-username', trimmed);
     setLoading(true);
     setError('');
 
@@ -366,7 +441,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      <FloatingPosters taglineCount={taglineCount} />
+      <FloatingPosters taglineCount={taglineCount} maxExtras={posterUnlocked ? 100 : 12} />
 
       <header style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 28px' }}>
         {/* Wordmark */}
@@ -414,11 +489,12 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
               fontSize: 'clamp(40px, 6vw, 62px)', fontWeight: 600,
               lineHeight: 1.02, letterSpacing: '-.02em', margin: '0 0 16px',
               color: 'var(--text)',
+              textShadow: '0 2px 18px rgba(0,0,0,.55), 0 1px 4px rgba(0,0,0,.35)',
             }}>
               Movie night,<br />
               <span style={{ color: 'var(--accent)' }}>together</span> from anywhere.
             </h1>
-            <p style={{ fontSize: 18, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 auto 30px', maxWidth: 420, fontWeight: 500 }}>
+            <p style={{ fontSize: 18, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 auto 30px', maxWidth: 420, fontWeight: 500, textShadow: '0 1px 10px rgba(0,0,0,.5)' }}>
               Spin up a room, share the PIN, and everything stays perfectly in sync — pause, laugh, and chat like you're on the same couch.
             </p>
 
@@ -442,13 +518,135 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
               <button onClick={() => setMode('create')} style={btnPrimary}>
                 <Icon name="plus" size={18} /> Create a room
               </button>
-              <button onClick={() => setMode('join')} style={btnSoft}>
-                <Icon name="door" size={18} /> Join with a PIN
+              <button onClick={() => setMode('rooms')} style={btnSoft}>
+                <Icon name="door" size={18} /> Join a room
               </button>
             </div>
             <WatchingNow />
           </div>
+        ) : mode === 'rooms' ? (
+          /* ── Room browser ── */
+          <div className="animate-pop-in" style={{
+            width: '100%', maxWidth: 440,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-xl)', padding: 30, boxShadow: 'var(--shadow)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+              <span style={{
+                width: 42, height: 42, borderRadius: 'var(--r-md)',
+                background: 'var(--accent-soft)', color: 'var(--accent)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}>
+                <Icon name="door" size={22} />
+              </span>
+              <div>
+                <h2 className="font-display" style={{ fontSize: 24, fontWeight: 600, margin: 0, color: 'var(--text)' }}>
+                  Join a room
+                </h2>
+                <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-dim)', fontWeight: 600 }}>
+                  Pick one below, or enter a PIN manually.
+                </p>
+              </div>
+            </div>
+
+            {loadingRooms && availableRooms.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-faint)', fontWeight: 600, fontSize: 14 }}>
+                Looking for rooms…
+              </div>
+            ) : availableRooms.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <p style={{ color: 'var(--text-faint)', fontWeight: 600, fontSize: 14, margin: '0 0 14px' }}>
+                  No active rooms right now.
+                </p>
+                <button onClick={() => setMode('create')} style={{ ...btnPrimary, fontSize: 14 }}>
+                  <Icon name="plus" size={16} /> Create one
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22, maxHeight: 320, overflowY: 'auto' }}>
+                {availableRooms.map((room) => (
+                  <button
+                    key={room.pin}
+                    onClick={() => selectRoom(room)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 14,
+                      padding: '12px 14px', borderRadius: 'var(--r-md)',
+                      border: '1.5px solid var(--border)', background: 'var(--surface-2)',
+                      textAlign: 'left', cursor: 'pointer', width: '100%',
+                    }}
+                  >
+                    {/* Member avatars */}
+                    <div style={{ display: 'flex', flexShrink: 0 }}>
+                      {room.memberCount === 0 ? (
+                        <span style={{
+                          width: 32, height: 32, borderRadius: '50%',
+                          background: 'var(--surface-3)', border: '1.5px dashed var(--border)',
+                          display: 'grid', placeItems: 'center', color: 'var(--text-faint)',
+                        }}>
+                          <Icon name="users" size={14} />
+                        </span>
+                      ) : (
+                        room.memberNames.slice(0, 3).map((name, i) => (
+                          <span key={i} title={name} style={{
+                            width: 32, height: 32, borderRadius: '50%',
+                            background: SOCIAL_COLORS[i % SOCIAL_COLORS.length],
+                            color: '#fff', display: 'grid', placeItems: 'center',
+                            fontWeight: 800, fontSize: 12,
+                            border: '2px solid var(--surface-2)',
+                            marginLeft: i ? -10 : 0,
+                          }}>
+                            {name[0].toUpperCase()}
+                          </span>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Room info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                        {room.memberCount === 0
+                          ? 'Empty room'
+                          : room.memberCount === 1
+                            ? `${room.memberNames[0]} is watching`
+                            : `${room.memberNames.slice(0, 2).join(', ')}${room.memberCount > 2 ? ` +${room.memberCount - 2}` : ''}`}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: room.memberCount === 0 ? 'var(--online)' : 'var(--text-faint)', marginTop: 2 }}>
+                        {room.memberCount === 0 ? 'Join without PIN' : 'PIN required'}
+                      </div>
+                    </div>
+
+                    <Icon name="chevron" size={16} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Manual PIN fallback */}
+            {availableRooms.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 18, marginTop: 4 }}>
+                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-faint)', margin: '0 0 10px', textAlign: 'center' }}>
+                  Or enter a PIN manually
+                </p>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <PinInput value={pin} onChange={setPin} />
+                  <button
+                    onClick={() => { setPinRequired(true); setMode('join'); }}
+                    disabled={pin.length !== 4}
+                    style={{ ...btnPrimary, fontSize: 13, padding: '10px 16px', opacity: pin.length !== 4 ? 0.4 : 1 }}
+                  >
+                    Join
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => { setMode('choose'); setPin(''); }} style={{ ...btnSoft, width: '100%', justifyContent: 'center', marginTop: 14, fontSize: 14 }}>
+              Back
+            </button>
+          </div>
+
         ) : (
+          /* ── Create / Join form ── */
           <div className="animate-pop-in" style={{
             width: '100%', maxWidth: 420,
             background: 'var(--surface)', border: '1px solid var(--border)',
@@ -467,7 +665,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
                   {mode === 'create' ? 'Create a room' : 'Join a room'}
                 </h2>
                 <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-dim)', fontWeight: 600 }}>
-                  {mode === 'create' ? "You'll be the host." : 'Ask the host for the 4-digit PIN.'}
+                  {mode === 'create' ? "You'll be the host." : pinRequired ? 'Enter the 4-digit PIN.' : 'No PIN needed — room is empty.'}
                 </p>
               </div>
             </div>
@@ -488,7 +686,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
                 />
               </label>
 
-              {mode === 'join' && (
+              {mode === 'join' && pinRequired && (
                 <label style={{ display: 'block' }}>
                   <span style={{ display: 'block', fontSize: 12, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--text-faint)', marginBottom: 7 }}>
                     Room PIN
@@ -504,7 +702,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
               )}
 
               <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
-                <button onClick={() => { setMode('choose'); setError(''); }} style={{ ...btnSoft, padding: '13px 18px' }}>
+                <button onClick={() => { setMode(mode === 'create' ? 'choose' : 'rooms'); setError(''); }} style={{ ...btnSoft, padding: '13px 18px' }}>
                   Back
                 </button>
                 <button
@@ -526,6 +724,42 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
       </footer>
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
+
+      <span style={{
+        position: 'fixed', bottom: 14, left: 18,
+        fontSize: 13, fontWeight: 700, color: 'var(--text-faint)',
+        letterSpacing: '.04em', pointerEvents: 'none', userSelect: 'none',
+      }}>
+        v{APP_VERSION}
+      </span>
+
+      <button
+        onClick={() => setPosterUnlocked((v) => !v)}
+        title={posterUnlocked ? 'Limit to 12 posters' : 'Allow up to 100 posters'}
+        style={{
+          position: 'fixed', bottom: 10, right: 16,
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '5px 10px 5px 12px', borderRadius: 99,
+          border: '1px solid var(--border)', background: 'var(--surface)',
+          color: 'var(--text-faint)', fontWeight: 700, fontSize: 12,
+          cursor: 'pointer', userSelect: 'none',
+        }}
+      >
+        Extra posters
+        <span style={{
+          position: 'relative', width: 32, height: 18, borderRadius: 99,
+          background: posterUnlocked ? 'var(--accent)' : 'rgba(128,128,128,.3)',
+          transition: 'background .2s',
+          display: 'inline-block', flexShrink: 0,
+        }}>
+          <span style={{
+            position: 'absolute', top: 3, left: posterUnlocked ? 17 : 3,
+            width: 12, height: 12, borderRadius: '50%', background: '#fff',
+            transition: 'left .2s',
+            boxShadow: '0 1px 3px rgba(0,0,0,.3)',
+          }} />
+        </span>
+      </button>
     </div>
   );
 }

@@ -178,11 +178,18 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         }
 
         if (playback.playing && video.paused) {
-          try {
-            await video.play();
-          } catch (err) {
-            console.error('video.play() rejected:', err);
-            setStreamError(`Playback blocked: ${(err as Error).message}. Try clicking the play button.`);
+          if (video.readyState < 2) {
+            // Video is still loading the new source; onCanPlay will retry play().
+          } else {
+            try {
+              await video.play();
+            } catch (err) {
+              // AbortError fires when a new load interrupts play() — onCanPlay retries, so ignore it.
+              if ((err as Error).name !== 'AbortError') {
+                console.error('video.play() rejected:', err);
+                setStreamError(`Playback blocked: ${(err as Error).message}. Try clicking the play button.`);
+              }
+            }
           }
         } else if (!playback.playing && !video.paused) {
           video.pause();

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Room, Video } from '../types';
 import { JellyfinBrowser } from './JellyfinBrowser';
 import { Icon } from './Icon';
@@ -9,6 +9,7 @@ interface Props {
   onSetCurrentVideo: (index: number) => void;
   onRemoveFromQueue: (index: number) => void;
   onAddVideo: (video: Video) => void;
+  onReorderQueue: (from: number, to: number) => void;
 }
 
 const MEMBER_COLORS = ['#ff7a52', '#6fae8e', '#5e6fb5', '#d98b9e', '#c98a52', '#7fa6cf', '#9b6ae0', '#3fae93'];
@@ -48,8 +49,10 @@ function CopyPin({ pin }: { pin: string }) {
   );
 }
 
-export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, onAddVideo }: Props) {
+export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, onAddVideo, onReorderQueue }: Props) {
   const [showBrowser, setShowBrowser] = useState(false);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const dragIndexRef = useRef<number | null>(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -129,16 +132,37 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
           )}
           {room.queue.map((video, index) => {
             const isCurrent = index === room.currentVideoIndex;
+            const isDragTarget = dragOver === index && dragIndexRef.current !== index;
             return (
               <div
                 key={video.id}
+                draggable={isHost && !isCurrent}
+                onDragStart={() => { dragIndexRef.current = index; }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(index); }}
+                onDragLeave={() => setDragOver(null)}
+                onDrop={() => {
+                  const from = dragIndexRef.current;
+                  if (from !== null && from !== index) onReorderQueue(from, index);
+                  dragIndexRef.current = null;
+                  setDragOver(null);
+                }}
+                onDragEnd={() => { dragIndexRef.current = null; setDragOver(null); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 11,
                   padding: 8, borderRadius: 'var(--r-md)',
-                  background: isCurrent ? 'var(--accent-soft)' : 'transparent',
-                  boxShadow: isCurrent ? 'inset 0 0 0 1.5px var(--accent)' : 'none',
+                  background: isCurrent ? 'var(--accent-soft)' : isDragTarget ? 'var(--surface-2)' : 'transparent',
+                  boxShadow: isCurrent ? 'inset 0 0 0 1.5px var(--accent)' : isDragTarget ? 'inset 0 0 0 1.5px var(--border)' : 'none',
+                  cursor: isHost && !isCurrent ? 'grab' : 'default',
+                  transition: 'background .1s, box-shadow .1s',
                 }}
               >
+                {/* Drag handle — host only, non-current items */}
+                {isHost && !isCurrent && (
+                  <span style={{ color: 'var(--text-faint)', flexShrink: 0, cursor: 'grab', display: 'grid', placeItems: 'center' }}>
+                    <Icon name="grip" size={16} />
+                  </span>
+                )}
+
                 {/* Thumbnail or gradient fallback */}
                 {video.thumbnailUrl ? (
                   <img

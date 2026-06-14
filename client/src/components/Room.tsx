@@ -5,6 +5,7 @@ import { VideoPlayer } from './VideoPlayer';
 import { Chat } from './Chat';
 import { Sidebar } from './Sidebar';
 import { Icon } from './Icon';
+import { useToasts, ToastContainer } from './Toast';
 
 interface Props {
   initialRoom: RoomType;
@@ -15,13 +16,17 @@ interface Props {
   onLeave: () => void;
 }
 
-export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLeave }: Props) {
+export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: Props) {
   const [room, setRoom] = useState<RoomType>(initialRoom);
+  const { toasts, addToast } = useToasts();
   const socket = getSocket();
 
+  // Derive host status from live room state so it updates when host changes.
+  const isHost = room.hostId === memberId;
+
   useEffect(() => {
-    socket.on('room:members_updated', ({ members }: { members: Member[] }) => {
-      setRoom((prev) => ({ ...prev, members }));
+    socket.on('room:members_updated', ({ members, hostId }: { members: Member[]; hostId: string }) => {
+      setRoom((prev) => ({ ...prev, members, hostId }));
     });
 
     socket.on('playback:update', ({ playback }: { playback: PlaybackState }) => {
@@ -39,13 +44,22 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
       setRoom((prev) => ({ ...prev, chat: [...prev.chat, message] }));
     });
 
+    socket.on('room:host_changed', ({ newHostId, newHostUsername }: { newHostId: string; newHostUsername: string }) => {
+      if (newHostId === memberId) {
+        addToast('You are now the host');
+      } else {
+        addToast(`${newHostUsername} is now the host`);
+      }
+    });
+
     return () => {
       socket.off('room:members_updated');
       socket.off('playback:update');
       socket.off('queue:update');
       socket.off('chat:message');
+      socket.off('room:host_changed');
     };
-  }, [socket]);
+  }, [socket, memberId, addToast]);
 
   const currentVideo = room.currentVideoIndex >= 0 ? room.queue[room.currentVideoIndex] : null;
 
@@ -106,7 +120,6 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0,
         }}>
-          {/* Wordmark */}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <span style={{
               width: 22, height: 22, borderRadius: '32% 32% 38% 38%',
@@ -122,7 +135,6 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
           </span>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Theme toggle */}
             <button
               onClick={onToggleTheme}
               title="Toggle theme"
@@ -135,7 +147,6 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
             </button>
 
-            {/* Leave */}
             <button
               onClick={onLeave}
               title="Leave room"
@@ -157,6 +168,7 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
           onSetCurrentVideo={(index) => socket.emit('queue:set_current', { index })}
           onRemoveFromQueue={(index) => socket.emit('queue:remove', { index })}
           onAddVideo={(video) => socket.emit('queue:add', { video })}
+          onReorderQueue={(from, to) => socket.emit('queue:reorder', { from, to })}
         />
 
         <Chat
@@ -165,6 +177,8 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
           onSend={(text) => socket.emit('chat:message', { text })}
         />
       </aside>
+
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

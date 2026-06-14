@@ -6,6 +6,7 @@ import path from 'path';
 import { setupSocket } from './socket';
 import jellyfinRouter from './routes/jellyfin';
 import adminRouter from './routes/admin';
+import roomsRouter from './routes/rooms';
 
 const app = express();
 const httpServer = createServer(app);
@@ -17,6 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/jellyfin', jellyfinRouter);
+app.use('/api/rooms', roomsRouter);
 app.use('/admin', adminRouter);
 
 const clientDist = path.join(__dirname, '../../client/dist');

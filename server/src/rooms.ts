@@ -1,6 +1,7 @@
 import { Room, Member } from './types';
 
 const rooms = new Map<string, Room>();
+const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function generatePin(): string {
   let pin: string;
@@ -32,29 +33,69 @@ export function getRoom(pin: string): Room | undefined {
 export function joinRoom(pin: string, memberId: string, username: string): Room | null {
   const room = rooms.get(pin);
   if (!room) return null;
-  if (!room.members.find((m: Member) => m.id === memberId)) {
-    room.members.push({ id: memberId, username, isHost: false });
+
+  // Cancel any pending cleanup timer — someone rejoined in time.
+  const timer = cleanupTimers.get(pin);
+  if (timer) {
+    clearTimeout(timer);
+    cleanupTimers.delete(pin);
   }
+
+  if (!room.members.find((m: Member) => m.id === memberId)) {
+    // If the room is empty (grace period), the first person back becomes host.
+    const isFirstMember = room.members.length === 0;
+    room.members.push({ id: memberId, username, isHost: isFirstMember });
+    if (isFirstMember) room.hostId = memberId;
+  }
+
   return room;
 }
 
-export function leaveRoom(pin: string, memberId: string): Room | null {
-  const room = rooms.get(pin);
-  if (!room) return null;
+export interface LeaveResult {
+  room: Room | null;
+  hostChanged: boolean;
+  newHostId?: string;
+  newHostUsername?: string;
+}
 
+export function leaveRoom(pin: string, memberId: string): LeaveResult {
+  const room = rooms.get(pin);
+  if (!room) return { room: null, hostChanged: false };
+
+  const wasHost = room.hostId === memberId;
   room.members = room.members.filter((m: Member) => m.id !== memberId);
 
   if (room.members.length === 0) {
-    rooms.delete(pin);
-    return null;
+    // Start a 60-second grace period before deleting the room.
+    const timer = setTimeout(() => {
+      rooms.delete(pin);
+      cleanupTimers.delete(pin);
+    }, 60_000);
+    cleanupTimers.set(pin, timer);
+    return { room: null, hostChanged: false };
   }
 
-  if (room.hostId === memberId) {
+  if (wasHost) {
     room.hostId = room.members[0].id;
     room.members[0].isHost = true;
+    return { room, hostChanged: true, newHostId: room.hostId, newHostUsername: room.members[0].username };
   }
 
-  return room;
+  return { room, hostChanged: false };
+}
+
+export interface RoomSummary {
+  pin: string;
+  memberCount: number;
+  memberNames: string[];
+}
+
+export function getAllRooms(): RoomSummary[] {
+  return Array.from(rooms.values()).map((room) => ({
+    pin: room.pin,
+    memberCount: room.members.length,
+    memberNames: room.members.map((m) => m.username),
+  }));
 }
 
 export function getOnlineStats(): { membersOnline: number; memberNames: string[] } {
@@ -65,7 +106,6 @@ export function getOnlineStats(): { membersOnline: number; memberNames: string[]
   return { membersOnline: names.length, memberNames: names };
 }
 
-// Calculates where the video currently is, accounting for time elapsed since last sync.
 export function getCurrentTimestamp(room: Room): number {
   if (!room.playback.playing) return room.playback.timestamp;
   return room.playback.timestamp + (Date.now() - room.playback.lastSyncedAt) / 1000;

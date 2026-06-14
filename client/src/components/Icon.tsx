@@ -159,6 +159,16 @@ export function Icon({ name, size = 20, stroke = 2, style, className }: IconProp
         <line x1="12" y1="17" x2="12.01" y2="17" />
       </>
     ),
+    grip: (
+      <>
+        <circle cx="9" cy="8"  r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="8"  r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="9" cy="12" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="12" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="9" cy="16" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="16" r="1.2" fill="currentColor" stroke="none" />
+      </>
+    ),
   };
 
   return <svg {...svgProps}>{icons[name] ?? null}</svg>;

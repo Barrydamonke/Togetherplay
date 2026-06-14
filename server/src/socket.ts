@@ -36,8 +36,9 @@ export function setupSocket(io: Server): void {
         },
       };
 
-      socket.emit('room:joined', { room: syncedRoom, isHost: false });
-      socket.to(pin).emit('room:members_updated', { members: room.members });
+      const isHost = room.hostId === socket.id;
+      socket.emit('room:joined', { room: syncedRoom, isHost });
+      socket.to(pin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
       io.emit('server:stats', getOnlineStats());
     });
 
@@ -142,9 +143,13 @@ export function setupSocket(io: Server): void {
 
     socket.on('disconnect', () => {
       if (!currentPin) return;
-      const room = leaveRoom(currentPin, socket.id);
+      const { room, hostChanged, newHostId, newHostUsername } = leaveRoom(currentPin, socket.id);
       if (room) {
-        io.to(currentPin).emit('room:members_updated', { members: room.members });
+        // Send members update first so isHost state settles before the toast fires.
+        io.to(currentPin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
+        if (hostChanged && newHostId && newHostUsername) {
+          io.to(currentPin).emit('room:host_changed', { newHostId, newHostUsername });
+        }
       }
       io.emit('server:stats', getOnlineStats());
     });
