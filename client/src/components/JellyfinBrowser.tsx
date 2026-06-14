@@ -30,6 +30,17 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
     { id: undefined, name: 'Library' },
   ]);
   const [adding, setAdding] = useState<string | null>(null);
+  const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
+
+  useEffect(() => {
+    fetch('/api/jellyfin/health')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; reason?: string }) => {
+        if (data.ok) setJellyfinStatus('ok');
+        else setJellyfinStatus(data.reason === 'not_configured' ? 'not_configured' : 'unreachable');
+      })
+      .catch(() => setJellyfinStatus('unreachable'));
+  }, []);
 
   const currentParentId = breadcrumbs[breadcrumbs.length - 1].id;
 
@@ -164,6 +175,24 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
           </form>
         </div>
 
+        {/* Jellyfin status pill */}
+        {jellyfinStatus && jellyfinStatus !== 'ok' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            margin: '0 20px 12px',
+            padding: '8px 14px', borderRadius: 99,
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            color: '#d97706',
+            fontWeight: 700, fontSize: 13,
+          }}>
+            <Icon name="warning" size={15} />
+            {jellyfinStatus === 'not_configured'
+              ? 'Jellyfin not configured — check Admin settings'
+              : 'Jellyfin server unreachable'}
+          </div>
+        )}
+
         {/* Items */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {loading && (
@@ -183,22 +212,23 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
                 key={item.Id}
                 style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 10, borderRadius: 'var(--r-md)' }}
               >
-                {playable ? (
+                <div style={{ position: 'relative', width: 44, height: 62, borderRadius: 8, flexShrink: 0, background: 'var(--surface-3)', overflow: 'hidden' }}>
+                  {browseable && (
+                    <span style={{
+                      position: 'absolute', inset: 0,
+                      color: 'var(--text-faint)',
+                      display: 'grid', placeItems: 'center',
+                    }}>
+                      <Icon name="folder" size={22} />
+                    </span>
+                  )}
                   <img
                     src={thumbnailUrl(item.Id)}
                     alt=""
-                    style={{ width: 44, height: 62, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: 'var(--surface-3)' }}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
-                ) : (
-                  <span style={{
-                    width: 44, height: 62, borderRadius: 8,
-                    background: 'var(--surface-3)', color: 'var(--text-faint)',
-                    display: 'grid', placeItems: 'center', flexShrink: 0,
-                  }}>
-                    <Icon name="folder" size={22} />
-                  </span>
-                )}
+                </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text)' }}>{item.Name}</div>

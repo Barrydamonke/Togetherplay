@@ -322,6 +322,17 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   const [loading, setLoading] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [taglineCount, setTaglineCount] = useState(0);
+  const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
+
+  useEffect(() => {
+    fetch('/api/jellyfin/health')
+      .then((r) => r.json())
+      .then((data: { ok: boolean; reason?: string }) => {
+        if (data.ok) setJellyfinStatus('ok');
+        else setJellyfinStatus(data.reason === 'not_configured' ? 'not_configured' : 'unreachable');
+      })
+      .catch(() => setJellyfinStatus('unreachable'));
+  }, []);
 
   function submit() {
     const trimmed = username.trim();
@@ -410,6 +421,23 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
             <p style={{ fontSize: 18, color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 auto 30px', maxWidth: 420, fontWeight: 500 }}>
               Spin up a room, share the PIN, and everything stays perfectly in sync — pause, laugh, and chat like you're on the same couch.
             </p>
+
+            {jellyfinStatus && jellyfinStatus !== 'ok' && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '7px 15px', borderRadius: 99, marginBottom: 20,
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: '#d97706',
+                fontWeight: 700, fontSize: 13,
+              }}>
+                <Icon name="warning" size={15} />
+                {jellyfinStatus === 'not_configured'
+                  ? 'Jellyfin not configured'
+                  : 'Jellyfin server unreachable'}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 28 }}>
               <button onClick={() => setMode('create')} style={btnPrimary}>
                 <Icon name="plus" size={18} /> Create a room

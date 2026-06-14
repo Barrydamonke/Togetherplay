@@ -58,6 +58,7 @@ export function Room({ initialRoom, isHost, memberId, theme, onToggleTheme, onLe
             streamUrl={currentVideo?.streamUrl ?? null}
             isHls={currentVideo?.isHls ?? true}
             knownDuration={currentVideo?.duration}
+            jellyfinId={currentVideo?.jellyfinId}
             playback={room.playback}
             isHost={isHost}
             onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}

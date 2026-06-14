@@ -2,10 +2,45 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { PlaybackState } from '../types';
 
+interface SubtitleTrack {
+  index: number;
+  language: string;
+  displayTitle: string;
+  isDefault: boolean;
+  isForced: boolean;
+}
+
+interface Cue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+function parseVttTime(t: string): number {
+  const parts = t.trim().split(':');
+  if (parts.length === 3) return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+  return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+}
+
+function parseVtt(raw: string): Cue[] {
+  return raw.split(/\n\n+/).flatMap((block) => {
+    const lines = block.trim().split('\n');
+    const ti = lines.findIndex((l) => l.includes('-->'));
+    if (ti === -1) return [];
+    const [startStr, endPart] = lines[ti].split('-->');
+    const start = parseVttTime(startStr);
+    // trim() before split handles the leading space left by the '-->' split
+    const end = parseVttTime(endPart.trim().split(/\s+/)[0]);
+    const text = lines.slice(ti + 1).join('\n').replace(/<[^>]+>/g, '').trim();
+    return text && isFinite(start) && isFinite(end) ? [{ start, end, text }] : [];
+  });
+}
+
 interface Props {
   streamUrl: string | null;
   isHls?: boolean;
   knownDuration?: number; // seconds from Jellyfin metadata, used before loadedmetadata fires
+  jellyfinId?: string;
   playback: PlaybackState;
   isHost: boolean;
   onPlay: (timestamp: number) => void;
@@ -25,7 +60,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, isHost, onPlay, onPause, onSeek, onEnded }: Props) {
+export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, onPlay, onPause, onSeek, onEnded }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRef = useRef(false);
@@ -42,6 +77,13 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
 
+  const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
+  const [subtitleCues, setSubtitleCues] = useState<Cue[]>([]);
+  const [activeCue, setActiveCue] = useState('');
+  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
+  const subtitleCuesRef = useRef<Cue[]>([]);
+
   // Refs so event listeners (set up with [streamUrl] dep) always see current values.
   const playbackRef = useRef(playback);
   const isHostRef = useRef(isHost);
@@ -49,6 +91,31 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
   useEffect(() => { playbackRef.current = playback; }, [playback]);
   useEffect(() => { isHostRef.current = isHost; }, [isHost]);
   useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
+  useEffect(() => { subtitleCuesRef.current = subtitleCues; }, [subtitleCues]);
+
+  // Fetch available subtitle tracks when the Jellyfin item changes.
+  useEffect(() => {
+    setSubtitleTracks([]);
+    setSelectedTrackIndex(null);
+    setSubtitleCues([]);
+    setActiveCue('');
+    if (!jellyfinId) return;
+    fetch(`/api/jellyfin/subtitle-tracks/${jellyfinId}`)
+      .then((r) => r.json())
+      .then((data: { tracks: SubtitleTrack[] }) => setSubtitleTracks(data.tracks))
+      .catch(() => {});
+  }, [jellyfinId]);
+
+  // Fetch and parse VTT when the user selects a track.
+  useEffect(() => {
+    setSubtitleCues([]);
+    setActiveCue('');
+    if (selectedTrackIndex === null || !jellyfinId) return;
+    fetch(`/api/jellyfin/subtitles/${jellyfinId}/${selectedTrackIndex}`)
+      .then((r) => r.text())
+      .then((text) => setSubtitleCues(parseVtt(text)))
+      .catch(() => {});
+  }, [selectedTrackIndex, jellyfinId]);
 
   // Seed duration from Jellyfin metadata whenever the video changes.
   // This fires immediately so the seek bar is usable before loadedmetadata resolves.
@@ -136,7 +203,13 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
     const readDuration = () => {
       if (isFinite(video.duration) && video.duration > 0) setDuration(video.duration);
     };
-    const onTimeUpdate = () => { setCurrentTime(video.currentTime); readDuration(); };
+    const onTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      readDuration();
+      const t = video.currentTime;
+      const cue = subtitleCuesRef.current.find((c) => t >= c.start && t <= c.end);
+      setActiveCue(cue?.text ?? '');
+    };
     const onSeeked = () => setCurrentTime(video.currentTime);
     const onLoadedMetadata = () => readDuration();
     const onDurationChange = () => readDuration();
@@ -342,6 +415,49 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
             </span>
           )}
 
+          {/* Subtitle track selector */}
+          {subtitleTracks.length > 0 && (
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowSubtitleMenu((s) => !s)}
+                title="Subtitles"
+                style={{
+                  background: selectedTrackIndex !== null ? 'var(--accent)' : 'rgba(255,255,255,.15)',
+                  border: 'none', color: '#fff',
+                  padding: '4px 8px', borderRadius: 6,
+                  fontWeight: 800, fontSize: 11, letterSpacing: '.06em',
+                  cursor: 'pointer', lineHeight: 1,
+                }}
+              >
+                CC
+              </button>
+              {showSubtitleMenu && (
+                <div style={{
+                  position: 'absolute', bottom: 'calc(100% + 8px)', right: 0,
+                  background: 'rgba(12,9,7,0.96)', border: '1px solid rgba(255,255,255,.12)',
+                  borderRadius: 10, padding: '5px 0', minWidth: 160,
+                  backdropFilter: 'blur(12px)',
+                  boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+                }}>
+                  {[{ index: null as number | null, displayTitle: 'Off' }, ...subtitleTracks].map((t) => (
+                    <button
+                      key={t.index ?? 'off'}
+                      onClick={() => { setSelectedTrackIndex(t.index); setShowSubtitleMenu(false); }}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '8px 14px', background: 'none', border: 'none',
+                        color: selectedTrackIndex === t.index ? 'var(--accent)' : 'rgba(255,255,255,.85)',
+                        fontWeight: 700, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {t.displayTitle}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Mute + volume */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button onClick={toggleMute} style={{ background: 'none', border: 'none', color: '#fff', padding: 4, display: 'grid', placeItems: 'center' }}>
@@ -389,6 +505,27 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, playback, 
           </button>
         </div>
       </div>
+
+      {/* Subtitle overlay */}
+      {activeCue && (
+        <div style={{
+          position: 'absolute', bottom: showControls ? 88 : 28,
+          left: 0, right: 0,
+          display: 'flex', justifyContent: 'center',
+          padding: '0 8%', pointerEvents: 'none',
+          transition: 'bottom .2s',
+        }}>
+          <div style={{
+            background: 'rgba(0,0,0,0.78)',
+            color: '#fff', padding: '5px 14px',
+            borderRadius: 6, fontSize: 17, fontWeight: 600,
+            lineHeight: 1.45, textAlign: 'center', whiteSpace: 'pre-line',
+            textShadow: '0 1px 4px rgba(0,0,0,.6)',
+          }}>
+            {activeCue}
+          </div>
+        </div>
+      )}
 
       {/* Buffering spinner */}
       {isBuffering && (

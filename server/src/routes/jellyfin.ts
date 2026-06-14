@@ -3,10 +3,15 @@ import { getConfig } from '../config';
 
 const router = Router();
 
+const JELLYFIN_HEADERS = {
+  'X-Emby-Token': '',
+  'User-Agent': 'Togetherness/1.0',
+};
+
 async function jellyfinFetch(path: string): Promise<unknown> {
   const { jellyfinUrl, jellyfinApiKey } = getConfig();
   const res = await fetch(`${jellyfinUrl}${path}`, {
-    headers: { 'X-Emby-Token': jellyfinApiKey },
+    headers: { ...JELLYFIN_HEADERS, 'X-Emby-Token': jellyfinApiKey },
   });
   if (!res.ok) throw new Error(`Jellyfin responded with ${res.status}`);
   return res.json();
@@ -116,6 +121,84 @@ router.get('/random-posters', async (_req: Request, res: Response) => {
   }
 });
 
+// Returns available subtitle tracks for a Jellyfin item.
+router.get('/subtitle-tracks/:itemId', async (req: Request, res: Response) => {
+  const { itemId } = req.params;
+  const { jellyfinUserId } = getConfig();
+  try {
+    const item = await jellyfinFetch(
+      `/Users/${jellyfinUserId}/Items/${itemId}?Fields=MediaSources`
+    ) as {
+      MediaSources?: Array<{
+        MediaStreams?: Array<{
+          Index: number;
+          Type: string;
+          Language?: string;
+          DisplayTitle?: string;
+          IsDefault?: boolean;
+          IsForced?: boolean;
+        }>;
+      }>;
+    };
+    const streams = item.MediaSources?.[0]?.MediaStreams ?? [];
+    const tracks = streams
+      .filter((s) => s.Type === 'Subtitle')
+      .map((s) => ({
+        index: s.Index,
+        language: s.Language ?? 'und',
+        displayTitle: s.DisplayTitle ?? `Track ${s.Index}`,
+        isDefault: s.IsDefault ?? false,
+        isForced: s.IsForced ?? false,
+      }));
+    res.json({ tracks });
+  } catch {
+    res.json({ tracks: [] });
+  }
+});
+
+// Proxies a subtitle VTT file so Jellyfin credentials stay server-side.
+router.get('/subtitles/:itemId/:trackIndex', async (req: Request, res: Response) => {
+  const { itemId, trackIndex } = req.params;
+  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId } = getConfig();
+  try {
+    // Resolve the mediaSourceId — required by Jellyfin's subtitle URL format.
+    const item = await jellyfinFetch(
+      `/Users/${jellyfinUserId}/Items/${itemId}?Fields=MediaSources`
+    ) as { MediaSources?: Array<{ Id: string }> };
+    const mediaSourceId = item.MediaSources?.[0]?.Id ?? itemId;
+
+    const r = await fetch(
+      `${jellyfinUrl}/Videos/${itemId}/${mediaSourceId}/Subtitles/${trackIndex}/0/Stream.vtt`,
+      { headers: { ...JELLYFIN_HEADERS, 'X-Emby-Token': jellyfinApiKey } }
+    );
+    if (!r.ok) { res.status(404).send('Not found'); return; }
+    const text = await r.text();
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(text);
+  } catch {
+    res.status(500).send('Error fetching subtitles');
+  }
+});
+
+// Quick reachability check — used by the landing page to show an offline marker.
+router.get('/health', async (_req: Request, res: Response) => {
+  const { jellyfinUrl, jellyfinApiKey } = getConfig();
+  if (!jellyfinUrl || !jellyfinApiKey) {
+    res.json({ ok: false, reason: 'not_configured' });
+    return;
+  }
+  try {
+    const r = await fetch(`${jellyfinUrl}/System/Info/Public`, {
+      headers: { ...JELLYFIN_HEADERS, 'X-Emby-Token': jellyfinApiKey },
+      signal: AbortSignal.timeout(5000),
+    });
+    res.json({ ok: r.ok, reason: r.ok ? undefined : 'unreachable' });
+  } catch {
+    res.json({ ok: false, reason: 'unreachable' });
+  }
+});
+
 // Proxy thumbnails so Jellyfin credentials stay server-side.
 router.get('/thumbnail/:itemId', async (req: Request, res: Response) => {
   const { itemId } = req.params;
@@ -124,7 +207,7 @@ router.get('/thumbnail/:itemId', async (req: Request, res: Response) => {
   try {
     const imageRes = await fetch(
       `${jellyfinUrl}/Items/${itemId}/Images/Primary?MaxWidth=${maxWidth}`,
-      { headers: { 'X-Emby-Token': jellyfinApiKey } }
+      { headers: { ...JELLYFIN_HEADERS, 'X-Emby-Token': jellyfinApiKey } }
     );
     if (!imageRes.ok) {
       res.status(404).send('Not found');
