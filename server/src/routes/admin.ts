@@ -37,8 +37,11 @@ router.get('/config', (req: Request, res: Response) => {
 
 router.post('/config', (req: Request, res: Response) => {
   if (!checkAuth(req, res)) return;
-  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl } = req.body as AppConfig;
-  saveConfig({ jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl });
+  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl, githubRepoUrl } = req.body as AppConfig;
+  saveConfig({
+    jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl,
+    githubRepoUrl: githubRepoUrl || 'https://github.com/Barrydamonke/Togetherness',
+  });
   res.json({ ok: true });
 });
 

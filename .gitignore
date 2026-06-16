@@ -14,6 +14,7 @@ server/dist/
 
 # Admin panel config (contains secrets — set via admin panel, not committed)
 server/config.json
+config.json
 
 # Logs
 logs/

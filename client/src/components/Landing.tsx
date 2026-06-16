@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 import { Room } from '../types';
 import { Icon } from './Icon';
+import { Logo } from './Logo';
 import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
 
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -447,19 +448,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
 
       <header style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 28px' }}>
         {/* Wordmark */}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
-          <span style={{
-            width: 28, height: 28, borderRadius: '32% 32% 38% 38%',
-            background: 'linear-gradient(150deg, var(--accent), color-mix(in oklab, var(--accent) 60%, #7d3552))',
-            display: 'grid', placeItems: 'center', color: 'var(--accent-ink)', flexShrink: 0,
-            boxShadow: '0 6px 16px -6px var(--accent)',
-          }}>
-            <Icon name="play" size={14} />
-          </span>
-          <span className="font-display" style={{ fontWeight: 600, fontSize: 20, letterSpacing: '-.01em', color: 'var(--text)' }}>
-            Togetherness
-          </span>
-        </span>
+        <Logo height={52} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Admin */}

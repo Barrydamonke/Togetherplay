@@ -73,19 +73,48 @@ Settings are saved to `server/config.json` and take effect immediately without a
 
 ---
 
-## Production deployment (Railway)
+## Self-hosting with Docker
 
-The project includes a `railway.toml` pre-configured for [Railway](https://railway.app).
+A `Dockerfile` and `docker-compose.yml` are included for self-hosted deployments (e.g. Unraid, a home server, or any VPS).
 
-1. Push the repo to GitHub
-2. Create a new Railway project and connect the repo
-3. Add the following environment variables in the Railway dashboard:
-   - `JELLYFIN_URL`
-   - `JELLYFIN_API_KEY`
-   - `JELLYFIN_USER_ID`
-   - `ADMIN_PASSWORD`
-   - `UPLOAD_SERVICE_URL` (optional)
-4. Deploy — Railway runs `npm run install:all && npm run build` then `npm start`
+### Quick start
+
+```bash
+# Clone the repo
+git clone https://github.com/Barrydamonke/Togetherness.git
+cd Togetherness
+
+# Set your admin password in docker-compose.yml, then:
+docker compose up -d
+```
+
+Open `http://<your-server-ip>:3000` in your browser.
+
+### Environment variables
+
+Set these in `docker-compose.yml` under `environment:`, or configure Jellyfin settings later through the in-app admin panel.
+
+| Variable | Required | Description |
+|---|---|---|
+| `ADMIN_PASSWORD` | Yes | Password for the admin panel |
+| `DATA_DIR` | Yes (set in compose) | Directory where `config.json` is stored — mount a volume here |
+| `JELLYFIN_URL` | No* | Full URL to your Jellyfin server |
+| `JELLYFIN_API_KEY` | No* | Jellyfin API key |
+| `JELLYFIN_USER_ID` | No* | Jellyfin user ID |
+| `UPLOAD_SERVICE_URL` | No | Optional upload service URL |
+
+*Can be configured at any time through the admin panel instead.
+
+### Volumes
+
+The compose file creates a named volume (`togetherness_data`) mounted at `/data`. This is where `config.json` is persisted so your settings survive container updates and restarts.
+
+### Updating
+
+```bash
+git pull
+docker compose up -d --build
+```
 
 ---
 

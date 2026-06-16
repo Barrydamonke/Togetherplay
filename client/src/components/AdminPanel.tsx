@@ -1,5 +1,6 @@
 import { useState, useEffect, CSSProperties } from 'react';
 import { Icon } from './Icon';
+import { useUpdateCheck } from '../lib/useUpdateCheck';
 
 interface Props {
   onClose: () => void;
@@ -10,6 +11,7 @@ interface Config {
   jellyfinApiKey: string;
   jellyfinUserId: string;
   uploadServiceUrl: string;
+  githubRepoUrl: string;
 }
 
 const inputStyle: CSSProperties = {
@@ -107,8 +109,10 @@ export function AdminPanel({ onClose }: Props) {
   const [loginLoading, setLoginLoading] = useState(false);
   const [config, setConfig] = useState<Config>({
     jellyfinUrl: '', jellyfinApiKey: '', jellyfinUserId: '', uploadServiceUrl: '',
+    githubRepoUrl: '',
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const updateCheck = useUpdateCheck(config.githubRepoUrl);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -288,6 +292,76 @@ export function AdminPanel({ onClose }: Props) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+            {/* Update status */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 14px', borderRadius: 10,
+              background: updateCheck.status === 'update-available' ? 'var(--accent-soft)' : 'var(--surface-2)',
+              border: `1.5px solid ${updateCheck.status === 'update-available' ? 'var(--accent)' : 'var(--border)'}`,
+              gap: 10,
+            }}>
+              {updateCheck.status === 'update-available' && (
+                <>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+                    Version {updateCheck.latestVersion} is available
+                  </span>
+                  <a
+                    href={updateCheck.releaseUrl ?? '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: 13, fontWeight: 800, color: 'var(--accent)',
+                      textDecoration: 'none', flexShrink: 0,
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    View release ↗
+                  </a>
+                </>
+              )}
+              {updateCheck.status === 'up-to-date' && (
+                <>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)' }}>
+                    Up to date{updateCheck.lastChecked
+                      ? ` as of ${new Date(updateCheck.lastChecked).toLocaleString()}`
+                      : ''}
+                  </span>
+                  <button
+                    onClick={updateCheck.recheck}
+                    style={{
+                      fontSize: 12, fontWeight: 700, color: 'var(--text-dim)',
+                      background: 'none', border: '1px solid var(--border)',
+                      padding: '4px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    Check now
+                  </button>
+                </>
+              )}
+              {updateCheck.status === 'checking' && (
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-faint)' }}>
+                  Checking for updates…
+                </span>
+              )}
+              {updateCheck.status === 'error' && (
+                <>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-dim)' }}>
+                    Couldn't check for updates
+                  </span>
+                  <button
+                    onClick={updateCheck.recheck}
+                    style={{
+                      fontSize: 12, fontWeight: 700, color: 'var(--text-dim)',
+                      background: 'none', border: '1px solid var(--border)',
+                      padding: '4px 10px', borderRadius: 6, cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >
+                    Try again
+                  </button>
+                </>
+              )}
+            </div>
+
             {/* Jellyfin section */}
             <section>
               <SectionHead label="Jellyfin" />
@@ -324,6 +398,17 @@ export function AdminPanel({ onClose }: Props) {
                 value={config.uploadServiceUrl}
                 onChange={patch('uploadServiceUrl')}
                 placeholder="https://uploads.example.com"
+              />
+            </section>
+
+            {/* Updates section */}
+            <section>
+              <SectionHead label="Updates" />
+              <Field
+                label="GitHub Repository URL"
+                value={config.githubRepoUrl}
+                onChange={patch('githubRepoUrl')}
+                placeholder="https://github.com/Barrydamonke/Togetherness"
               />
             </section>
 

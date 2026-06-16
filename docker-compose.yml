@@ -1,0 +1,19 @@
+services:
+  togetherness:
+    build: .
+    container_name: togetherness
+    ports:
+      - "3000:3000"
+    environment:
+      - DATA_DIR=/data
+      - ADMIN_PASSWORD=changeme
+      # These can be set here or configured later through the admin panel
+      # - JELLYFIN_URL=https://media.example.com
+      # - JELLYFIN_API_KEY=your_api_key
+      # - JELLYFIN_USER_ID=your_user_id
+    volumes:
+      - togetherness_data:/data
+    restart: unless-stopped
+
+volumes:
+  togetherness_data:

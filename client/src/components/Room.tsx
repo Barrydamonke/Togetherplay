@@ -5,6 +5,7 @@ import { VideoPlayer } from './VideoPlayer';
 import { Chat } from './Chat';
 import { Sidebar } from './Sidebar';
 import { Icon } from './Icon';
+import { Logo } from './Logo';
 import { useToasts, ToastContainer } from './Toast';
 
 interface Props {
@@ -120,19 +121,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '14px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0,
         }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-            <span style={{
-              width: 22, height: 22, borderRadius: '32% 32% 38% 38%',
-              background: 'linear-gradient(150deg, var(--accent), color-mix(in oklab, var(--accent) 60%, #7d3552))',
-              display: 'grid', placeItems: 'center', color: 'var(--accent-ink)', flexShrink: 0,
-              boxShadow: '0 4px 10px -4px var(--accent)',
-            }}>
-              <Icon name="play" size={11} />
-            </span>
-            <span className="font-display" style={{ fontWeight: 600, fontSize: 15, letterSpacing: '-.01em', color: 'var(--text)' }}>
-              Togetherness
-            </span>
-          </span>
+          <Logo height={28} />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
