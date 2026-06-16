@@ -12,7 +12,7 @@ export interface UpdateState {
 }
 
 function parseSemver(v: string): number[] {
-  return v.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+  return v.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
 }
 
 function isNewer(latest: string, current: string): boolean {

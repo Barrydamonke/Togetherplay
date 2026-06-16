@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icon';
+import { useUpdateCheck } from '../lib/useUpdateCheck';
 
 interface Props {
   onClose: () => void;
+  onOpenAdmin: () => void;
 }
 
 interface VersionEntry {
@@ -80,9 +82,10 @@ function renderMarkdown(raw: string): React.ReactNode {
   return <>{out}</>;
 }
 
-export function ReleaseNotes({ onClose }: Props) {
+export function ReleaseNotes({ onClose, onOpenAdmin }: Props) {
   const [entries, setEntries] = useState<VersionEntry[]>([]);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const updateCheck = useUpdateCheck();
 
   useEffect(() => {
     fetch('/release-notes/index.json')
@@ -149,27 +152,52 @@ export function ReleaseNotes({ onClose }: Props) {
       >
         {/* Header */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '18px 22px', borderBottom: '1px solid var(--border)', flexShrink: 0,
         }}>
-          <div>
-            <h2 className="font-display" style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>
-              Release notes
-            </h2>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)', fontWeight: 600 }}>
-              What's changed in each version
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 className="font-display" style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>
+                Release notes
+              </h2>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)', fontWeight: 600 }}>
+                What's changed in each version
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center',
+                border: '1px solid var(--border)', background: 'var(--surface-2)',
+                color: 'var(--text-dim)', flexShrink: 0,
+              }}
+            >
+              <Icon name="close" size={15} />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center',
-              border: '1px solid var(--border)', background: 'var(--surface-2)',
-              color: 'var(--text-dim)', flexShrink: 0,
-            }}
-          >
-            <Icon name="close" size={15} />
-          </button>
+
+          {updateCheck.status === 'update-available' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginTop: 12, padding: '9px 13px', borderRadius: 10,
+              background: 'var(--accent-soft)', border: '1.5px solid var(--accent)',
+              gap: 10,
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+                Version {updateCheck.latestVersion} is available
+              </span>
+              <button
+                onClick={onOpenAdmin}
+                style={{
+                  fontSize: 13, fontWeight: 800, color: 'var(--accent-ink)',
+                  background: 'var(--accent)', border: 'none',
+                  padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
+                  flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                Update <Icon name="chevron" size={13} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Version list */}

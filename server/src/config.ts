@@ -7,6 +7,7 @@ export interface AppConfig {
   jellyfinUserId: string;
   uploadServiceUrl: string;
   githubRepoUrl: string;
+  landingMessage: string;
 }
 
 const CONFIG_PATH = join(process.env.DATA_DIR ?? process.cwd(), 'config.json');
@@ -21,6 +22,7 @@ function load(): AppConfig {
         jellyfinUserId: stored.jellyfinUserId ?? '',
         uploadServiceUrl: stored.uploadServiceUrl ?? '',
         githubRepoUrl: stored.githubRepoUrl ?? 'https://github.com/Barrydamonke/Togetherness',
+        landingMessage: stored.landingMessage ?? '',
       };
     } catch {}
   }
@@ -30,6 +32,7 @@ function load(): AppConfig {
     jellyfinUserId: process.env.JELLYFIN_USER_ID ?? '',
     uploadServiceUrl: process.env.UPLOAD_SERVICE_URL ?? '',
     githubRepoUrl: 'https://github.com/Barrydamonke/Togetherness',
+    landingMessage: '',
   };
 }
 

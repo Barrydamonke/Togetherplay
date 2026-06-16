@@ -7,6 +7,7 @@ import { setupSocket } from './socket';
 import jellyfinRouter from './routes/jellyfin';
 import adminRouter from './routes/admin';
 import roomsRouter from './routes/rooms';
+import { getConfig } from './config';
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,6 +21,10 @@ app.use(express.json());
 app.use('/api/jellyfin', jellyfinRouter);
 app.use('/api/rooms', roomsRouter);
 app.use('/admin', adminRouter);
+
+app.get('/api/landing-message', (_req, res) => {
+  res.json({ message: getConfig().landingMessage });
+});
 
 const clientDist = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientDist));

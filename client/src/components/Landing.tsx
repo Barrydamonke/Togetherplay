@@ -6,7 +6,7 @@ import { Logo } from './Logo';
 import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
 
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -37,6 +37,40 @@ function shuffle<T>(arr: T[]): T[] {
     [a[k], a[j]] = [a[j], a[k]];
   }
   return a;
+}
+
+function LandingMessage() {
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      fetch('/api/landing-message')
+        .then((r) => r.json())
+        .then((d: { message: string }) => { if (alive) setMessage(d.message ?? ''); })
+        .catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 30_000);
+    return () => { alive = false; clearInterval(timer); };
+  }, []);
+
+  if (!message) return null;
+
+  return (
+    <footer style={{ position: 'relative', textAlign: 'center', padding: '0 20px 28px' }}>
+      <div style={{
+        display: 'inline-block', maxWidth: 640,
+        padding: '14px 24px', borderRadius: 14,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow)',
+        fontSize: 15, fontWeight: 600, color: 'var(--text-dim)',
+        lineHeight: 1.6, whiteSpace: 'pre-wrap', textAlign: 'left',
+      }}>
+        {message}
+      </div>
+    </footer>
+  );
 }
 
 const ENTRY_TRANSFORMS: Record<string, string> = {
@@ -710,12 +744,15 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
         )}
       </main>
 
-      <footer style={{ position: 'relative', textAlign: 'center', padding: '0 20px 22px', color: 'var(--text-faint)', fontSize: 13, fontWeight: 600 }}>
-        Plays anything from your own server · everyone stays in sync to the millisecond
-      </footer>
+      <LandingMessage />
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
-      {showReleaseNotes && <ReleaseNotes onClose={() => setShowReleaseNotes(false)} />}
+      {showReleaseNotes && (
+        <ReleaseNotes
+          onClose={() => setShowReleaseNotes(false)}
+          onOpenAdmin={() => { setShowReleaseNotes(false); setShowAdmin(true); }}
+        />
+      )}
 
       <button
         onClick={() => setShowReleaseNotes(true)}

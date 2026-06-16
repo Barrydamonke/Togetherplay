@@ -12,6 +12,7 @@ interface Config {
   jellyfinUserId: string;
   uploadServiceUrl: string;
   githubRepoUrl: string;
+  landingMessage: string;
 }
 
 const inputStyle: CSSProperties = {
@@ -109,7 +110,7 @@ export function AdminPanel({ onClose }: Props) {
   const [loginLoading, setLoginLoading] = useState(false);
   const [config, setConfig] = useState<Config>({
     jellyfinUrl: '', jellyfinApiKey: '', jellyfinUserId: '', uploadServiceUrl: '',
-    githubRepoUrl: '',
+    githubRepoUrl: '', landingMessage: '',
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const updateCheck = useUpdateCheck(config.githubRepoUrl);
@@ -410,6 +411,27 @@ export function AdminPanel({ onClose }: Props) {
                 onChange={patch('githubRepoUrl')}
                 placeholder="https://github.com/Barrydamonke/Togetherness"
               />
+            </section>
+
+            {/* Landing page section */}
+            <section>
+              <SectionHead label="Landing Page" />
+              <label style={{ display: 'block' }}>
+                <span style={labelStyle}>Message</span>
+                <textarea
+                  value={config.landingMessage}
+                  onChange={(e) => patch('landingMessage')(e.target.value)}
+                  placeholder="Message shown at the bottom of the landing page… (leave blank to hide)"
+                  rows={3}
+                  spellCheck={false}
+                  style={{
+                    ...inputStyle,
+                    resize: 'vertical',
+                    lineHeight: 1.6,
+                    minHeight: 80,
+                  }}
+                />
+              </label>
             </section>
 
             {/* Save */}
