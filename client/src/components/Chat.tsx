@@ -8,8 +8,21 @@ interface Props {
   onSend: (text: string) => void;
 }
 
+function formatClockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatVideoTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function Chat({ messages, currentMemberId, onSend }: Props) {
   const [text, setText] = useState('');
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,9 +58,35 @@ export function Chat({ messages, currentMemberId, onSend }: Props) {
         padding: '4px 14px', display: 'flex', flexDirection: 'column', gap: 9,
       }}>
         {messages.map((msg) => {
+          if (msg.type === 'system') {
+            return (
+              <div key={msg.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: 'var(--text-faint)',
+                  whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                  <Icon name="play" size={10} style={{ opacity: 0.6 }} /> {msg.text}
+                </span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border-soft)' }} />
+              </div>
+            );
+          }
+
           const isMe = msg.memberId === currentMemberId;
+          const isHovered = hoveredId === msg.id;
+          const timestampParts: string[] = [formatClockTime(msg.sentAt)];
+          if (msg.videoTimestamp !== undefined) {
+            timestampParts.push(`at ${formatVideoTime(msg.videoTimestamp)}`);
+          }
+
           return (
-            <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+            <div
+              key={msg.id}
+              onMouseEnter={() => setHoveredId(msg.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}
+            >
               {!isMe && (
                 <span style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--accent)', marginBottom: 2, paddingLeft: 2 }}>
                   {msg.username}
@@ -62,6 +101,16 @@ export function Chat({ messages, currentMemberId, onSend }: Props) {
               }}>
                 {msg.text}
               </span>
+              {isHovered && (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, color: 'var(--text-faint)',
+                  marginTop: 3,
+                  paddingLeft: isMe ? 0 : 2,
+                  paddingRight: isMe ? 2 : 0,
+                }}>
+                  {timestampParts.join(' · ')}
+                </span>
+              )}
             </div>
           );
         })}

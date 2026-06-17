@@ -21,7 +21,7 @@ function load(): AppConfig {
         jellyfinApiKey: stored.jellyfinApiKey ?? '',
         jellyfinUserId: stored.jellyfinUserId ?? '',
         uploadServiceUrl: stored.uploadServiceUrl ?? '',
-        githubRepoUrl: stored.githubRepoUrl ?? 'https://github.com/Barrydamonke/Togetherness',
+        githubRepoUrl: stored.githubRepoUrl ?? 'https://github.com/Barrydamonke/Togetherplay',
         landingMessage: stored.landingMessage ?? '',
       };
     } catch {}
@@ -31,7 +31,7 @@ function load(): AppConfig {
     jellyfinApiKey: process.env.JELLYFIN_API_KEY ?? '',
     jellyfinUserId: process.env.JELLYFIN_USER_ID ?? '',
     uploadServiceUrl: process.env.UPLOAD_SERVICE_URL ?? '',
-    githubRepoUrl: 'https://github.com/Barrydamonke/Togetherness',
+    githubRepoUrl: 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: '',
   };
 }

@@ -43,6 +43,7 @@ interface Props {
   jellyfinId?: string;
   playback: PlaybackState;
   isHost: boolean;
+  canControl: boolean;
   onPlay: (timestamp: number) => void;
   onPause: (timestamp: number) => void;
   onSeek: (timestamp: number) => void;
@@ -60,7 +61,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, onPlay, onPause, onSeek, onEnded }: Props) {
+export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRef = useRef(false);
@@ -281,15 +282,21 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   // Controls
 
   const handlePlayPause = () => {
-    if (!isHost) return;
+    if (!canControl) return;
     const video = videoRef.current;
     if (!video) return;
-    if (video.paused) onPlay(video.currentTime);
-    else onPause(video.currentTime);
+    if (video.paused) {
+      // Act immediately in the user-gesture context so the browser allows play().
+      video.play().catch(() => {});
+      onPlay(video.currentTime);
+    } else {
+      video.pause();
+      onPause(video.currentTime);
+    }
   };
 
   const handleSeekClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isHost || !duration) return;
+    if (!canControl || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const newTime = ratio * duration;
@@ -367,14 +374,14 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
           style={{
             width: '100%', height: 6, borderRadius: 99,
             background: 'rgba(255,255,255,.24)', position: 'relative',
-            cursor: isHost ? 'pointer' : 'default',
+            cursor: canControl ? 'pointer' : 'default',
           }}
         >
           <div style={{
             position: 'absolute', inset: 0, borderRadius: 99,
             width: `${progress}%`, background: 'var(--accent)',
           }} />
-          {isHost && (
+          {canControl && (
             <div style={{
               position: 'absolute', top: '50%', left: `${progress}%`,
               width: 14, height: 14, borderRadius: '50%', background: '#fff',
@@ -389,9 +396,9 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
           {/* Play / Pause */}
           <button
             onClick={handlePlayPause}
-            disabled={!isHost}
-            title={isHost ? undefined : 'Only the host can control playback'}
-            style={{ background: 'none', border: 'none', color: '#fff', padding: 4, opacity: isHost ? 1 : 0.3, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+            disabled={!canControl}
+            title={canControl ? undefined : 'Only the host can control playback'}
+            style={{ background: 'none', border: 'none', color: '#fff', padding: 4, opacity: canControl ? 1 : 0.3, display: 'grid', placeItems: 'center', flexShrink: 0 }}
           >
             {isPlaying ? (
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">

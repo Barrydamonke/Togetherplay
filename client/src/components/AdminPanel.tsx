@@ -409,7 +409,7 @@ export function AdminPanel({ onClose }: Props) {
                 label="GitHub Repository URL"
                 value={config.githubRepoUrl}
                 onChange={patch('githubRepoUrl')}
-                placeholder="https://github.com/Barrydamonke/Togetherness"
+                placeholder="https://github.com/Barrydamonke/Togetherplay"
               />
             </section>
 

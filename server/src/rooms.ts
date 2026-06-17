@@ -11,11 +11,14 @@ function generatePin(): string {
   return pin;
 }
 
-export function createRoom(hostId: string, hostUsername: string): Room {
+export function createRoom(hostId: string, hostUsername: string, hidden = false): Room {
   const pin = generatePin();
   const room: Room = {
     pin,
     hostId,
+    hidden,
+    viewerCanManageQueue: false,
+    viewerCanControl: false,
     members: [{ id: hostId, username: hostUsername, isHost: true }],
     queue: [],
     currentVideoIndex: -1,
@@ -23,6 +26,25 @@ export function createRoom(hostId: string, hostUsername: string): Room {
     chat: [],
   };
   rooms.set(pin, room);
+  return room;
+}
+
+export function updateRoomSettings(
+  pin: string,
+  settings: Partial<Pick<Room, 'hidden' | 'viewerCanManageQueue' | 'viewerCanControl'>>,
+): Room | null {
+  const room = rooms.get(pin);
+  if (!room) return null;
+  Object.assign(room, settings);
+  return room;
+}
+
+export function renameMember(pin: string, memberId: string, username: string): Room | null {
+  const room = rooms.get(pin);
+  if (!room) return null;
+  const member = room.members.find((m) => m.id === memberId);
+  if (!member) return null;
+  member.username = username.trim().slice(0, 32) || member.username;
   return room;
 }
 
@@ -91,11 +113,13 @@ export interface RoomSummary {
 }
 
 export function getAllRooms(): RoomSummary[] {
-  return Array.from(rooms.values()).map((room) => ({
-    pin: room.pin,
-    memberCount: room.members.length,
-    memberNames: room.members.map((m) => m.username),
-  }));
+  return Array.from(rooms.values())
+    .filter((room) => !room.hidden)
+    .map((room) => ({
+      pin: room.pin,
+      memberCount: room.members.length,
+      memberNames: room.members.map((m) => m.username),
+    }));
 }
 
 export function getOnlineStats(): { membersOnline: number; memberNames: string[] } {

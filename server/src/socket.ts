@@ -1,7 +1,19 @@
 import { Server, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
-import { createRoom, getRoom, joinRoom, leaveRoom, getCurrentTimestamp, getOnlineStats } from './rooms';
+import { createRoom, getRoom, joinRoom, leaveRoom, getCurrentTimestamp, getOnlineStats, updateRoomSettings, renameMember } from './rooms';
 import { Video, ChatMessage } from './types';
+
+function emitSystemMessage(io: Server, pin: string, text: string): void {
+  const message: ChatMessage = {
+    id: randomUUID(),
+    memberId: 'system',
+    username: 'system',
+    text,
+    sentAt: Date.now(),
+    type: 'system',
+  };
+  io.to(pin).emit('chat:message', { message });
+}
 
 export function setupSocket(io: Server): void {
   io.on('connection', (socket: Socket) => {
@@ -9,8 +21,8 @@ export function setupSocket(io: Server): void {
 
     socket.emit('server:stats', getOnlineStats());
 
-    socket.on('room:create', ({ username }: { username: string }) => {
-      const room = createRoom(socket.id, username);
+    socket.on('room:create', ({ username, hidden }: { username: string; hidden?: boolean }) => {
+      const room = createRoom(socket.id, username, hidden ?? false);
       currentPin = room.pin;
       socket.join(room.pin);
       socket.emit('room:joined', { room, isHost: true });
@@ -45,7 +57,8 @@ export function setupSocket(io: Server): void {
     socket.on('playback:play', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
       const room = getRoom(currentPin);
-      if (!room || room.hostId !== socket.id) return;
+      if (!room) return;
+      if (room.hostId !== socket.id && !room.viewerCanControl) return;
       room.playback = { playing: true, timestamp, lastSyncedAt: Date.now() };
       io.to(currentPin).emit('playback:update', { playback: room.playback });
     });
@@ -53,7 +66,8 @@ export function setupSocket(io: Server): void {
     socket.on('playback:pause', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
       const room = getRoom(currentPin);
-      if (!room || room.hostId !== socket.id) return;
+      if (!room) return;
+      if (room.hostId !== socket.id && !room.viewerCanControl) return;
       room.playback = { playing: false, timestamp, lastSyncedAt: Date.now() };
       io.to(currentPin).emit('playback:update', { playback: room.playback });
     });
@@ -61,7 +75,8 @@ export function setupSocket(io: Server): void {
     socket.on('playback:seek', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
       const room = getRoom(currentPin);
-      if (!room || room.hostId !== socket.id) return;
+      if (!room) return;
+      if (room.hostId !== socket.id && !room.viewerCanControl) return;
       room.playback = { ...room.playback, timestamp, lastSyncedAt: Date.now() };
       io.to(currentPin).emit('playback:update', { playback: room.playback });
     });
@@ -69,13 +84,15 @@ export function setupSocket(io: Server): void {
     socket.on('queue:add', ({ video }: { video: Video }) => {
       if (!currentPin) return;
       const room = getRoom(currentPin);
-      if (!room || room.hostId !== socket.id) return;
+      if (!room) return;
+      if (room.hostId !== socket.id && !room.viewerCanManageQueue) return;
       const wasEmpty = room.currentVideoIndex === -1;
       room.queue.push(video);
       if (wasEmpty) {
         room.currentVideoIndex = 0;
         room.playback = { playing: true, timestamp: 0, lastSyncedAt: Date.now() };
         io.to(currentPin).emit('playback:update', { playback: room.playback });
+        emitSystemMessage(io, currentPin, `${video.title} has started playing`);
       }
       io.to(currentPin).emit('queue:update', {
         queue: room.queue,
@@ -109,12 +126,15 @@ export function setupSocket(io: Server): void {
         currentVideoIndex: room.currentVideoIndex,
       });
       io.to(currentPin).emit('playback:update', { playback: room.playback });
+      const video = room.queue[index];
+      if (video) emitSystemMessage(io, currentPin, `${video.title} has started playing`);
     });
 
     socket.on('queue:reorder', ({ from, to }: { from: number; to: number }) => {
       if (!currentPin) return;
       const room = getRoom(currentPin);
-      if (!room || room.hostId !== socket.id) return;
+      if (!room) return;
+      if (room.hostId !== socket.id && !room.viewerCanManageQueue) return;
       const [item] = room.queue.splice(from, 1);
       room.queue.splice(to, 0, item);
       io.to(currentPin).emit('queue:update', {
@@ -122,6 +142,24 @@ export function setupSocket(io: Server): void {
         currentVideoIndex: room.currentVideoIndex,
       });
     });
+
+    socket.on('room:rename_self', ({ username }: { username: string }) => {
+      if (!currentPin) return;
+      const room = renameMember(currentPin, socket.id, username);
+      if (!room) return;
+      io.to(currentPin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
+    });
+
+    socket.on(
+      'room:update_settings',
+      ({ hidden, viewerCanManageQueue, viewerCanControl }: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean }>) => {
+        if (!currentPin) return;
+        const room = getRoom(currentPin);
+        if (!room || room.hostId !== socket.id) return;
+        updateRoomSettings(currentPin, { hidden, viewerCanManageQueue, viewerCanControl });
+        io.to(currentPin).emit('room:settings_updated', { hidden: room.hidden, viewerCanManageQueue: room.viewerCanManageQueue, viewerCanControl: room.viewerCanControl });
+      },
+    );
 
     socket.on('chat:message', ({ text }: { text: string }) => {
       if (!currentPin) return;
@@ -135,6 +173,7 @@ export function setupSocket(io: Server): void {
         username: member.username,
         text: text.slice(0, 500),
         sentAt: Date.now(),
+        videoTimestamp: room.currentVideoIndex >= 0 ? getCurrentTimestamp(room) : undefined,
       };
       room.chat.push(message);
       if (room.chat.length > 200) room.chat.shift();

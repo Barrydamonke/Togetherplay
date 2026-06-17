@@ -40,7 +40,7 @@ router.post('/config', (req: Request, res: Response) => {
   const { jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl, githubRepoUrl, landingMessage } = req.body as AppConfig;
   saveConfig({
     jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl,
-    githubRepoUrl: githubRepoUrl || 'https://github.com/Barrydamonke/Togetherness',
+    githubRepoUrl: githubRepoUrl || 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: landingMessage ?? '',
   });
   res.json({ ok: true });

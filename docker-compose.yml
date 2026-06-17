@@ -1,6 +1,6 @@
 services:
-  togetherness:
-    build: /mnt/user/appdata/togetherness
+  togetherplay:
+    build: /mnt/user/appdata/togetherplay
     container_name: togetherplay
     ports:
       - "3000:3000"
@@ -8,5 +8,5 @@ services:
       - DATA_DIR=/data
       - ADMIN_PASSWORD=changme
     volumes:
-      - /mnt/user/appdata/togetherness/data:/data
+      - /mnt/user/appdata/togetherplay/data:/data
     restart: unless-stopped

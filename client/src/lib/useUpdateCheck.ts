@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const DEFAULT_REPO_URL = 'https://github.com/Barrydamonke/Togetherness';
+const DEFAULT_REPO_URL = 'https://github.com/Barrydamonke/Togetherplay';
 const LS_KEY = 'tg-update-check';
 const INTERVAL_MS = 60 * 60 * 1000;
 

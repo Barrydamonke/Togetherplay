@@ -1,4 +1,4 @@
-# Togetherness
+# Togetherplay
 
 Watch videos together in real time. One person hosts a room, shares a PIN, and everyone stays perfectly in sync — pause, seek, and chat like you're on the same couch. Streams directly from your own Jellyfin server.
 
@@ -81,8 +81,8 @@ A `Dockerfile` and `docker-compose.yml` are included for self-hosted deployments
 
 ```bash
 # Clone the repo
-git clone https://github.com/Barrydamonke/Togetherness.git
-cd Togetherness
+git clone https://github.com/Barrydamonke/Togetherplay.git
+cd Togetherplay
 
 # Set your admin password in docker-compose.yml, then:
 docker compose up -d

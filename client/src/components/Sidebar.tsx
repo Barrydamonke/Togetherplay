@@ -53,6 +53,7 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
   const [showBrowser, setShowBrowser] = useState(false);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const dragIndexRef = useRef<number | null>(null);
+  const canManageQueue = isHost || room.viewerCanManageQueue;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -109,7 +110,7 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>
             <Icon name="list" size={13} /> Up next
           </span>
-          {isHost && (
+          {canManageQueue && (
             <button
               onClick={() => setShowBrowser(true)}
               style={{
@@ -127,7 +128,7 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {room.queue.length === 0 && (
             <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5, fontWeight: 600, padding: '20px 0' }}>
-              {isHost ? 'Add something to watch.' : "Queue's empty."}
+              {canManageQueue ? 'Add something to watch.' : "Queue's empty."}
             </p>
           )}
           {room.queue.map((video, index) => {
@@ -136,7 +137,7 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
             return (
               <div
                 key={video.id}
-                draggable={isHost && !isCurrent}
+                draggable={canManageQueue && !isCurrent}
                 onDragStart={() => { dragIndexRef.current = index; }}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(index); }}
                 onDragLeave={() => setDragOver(null)}
@@ -152,12 +153,12 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
                   padding: 8, borderRadius: 'var(--r-md)',
                   background: isCurrent ? 'var(--accent-soft)' : isDragTarget ? 'var(--surface-2)' : 'transparent',
                   boxShadow: isCurrent ? 'inset 0 0 0 1.5px var(--accent)' : isDragTarget ? 'inset 0 0 0 1.5px var(--border)' : 'none',
-                  cursor: isHost && !isCurrent ? 'grab' : 'default',
+                  cursor: canManageQueue && !isCurrent ? 'grab' : 'default',
                   transition: 'background .1s, box-shadow .1s',
                 }}
               >
-                {/* Drag handle — host only, non-current items */}
-                {isHost && !isCurrent && (
+                {/* Drag handle — non-current items when queue management is allowed */}
+                {canManageQueue && !isCurrent && (
                   <span style={{ color: 'var(--text-faint)', flexShrink: 0, cursor: 'grab', display: 'grid', placeItems: 'center' }}>
                     <Icon name="grip" size={16} />
                   </span>

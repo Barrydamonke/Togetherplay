@@ -4,6 +4,7 @@ import { getSocket } from '../lib/socket';
 import { VideoPlayer } from './VideoPlayer';
 import { Chat } from './Chat';
 import { Sidebar } from './Sidebar';
+import { RoomSettings } from './RoomSettings';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 import { useToasts, ToastContainer } from './Toast';
@@ -19,6 +20,7 @@ interface Props {
 
 export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: Props) {
   const [room, setRoom] = useState<RoomType>(initialRoom);
+  const [showSettings, setShowSettings] = useState(false);
   const { toasts, addToast } = useToasts();
   const socket = getSocket();
 
@@ -53,12 +55,20 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
       }
     });
 
+    socket.on(
+      'room:settings_updated',
+      (settings: { hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean }) => {
+        setRoom((prev) => ({ ...prev, ...settings }));
+      },
+    );
+
     return () => {
       socket.off('room:members_updated');
       socket.off('playback:update');
       socket.off('queue:update');
       socket.off('chat:message');
       socket.off('room:host_changed');
+      socket.off('room:settings_updated');
     };
   }, [socket, memberId, addToast]);
 
@@ -76,6 +86,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
             jellyfinId={currentVideo?.jellyfinId}
             playback={room.playback}
             isHost={isHost}
+            canControl={isHost || room.viewerCanControl}
             onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
             onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
             onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
@@ -125,6 +136,18 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
+              onClick={() => setShowSettings(true)}
+              title="Room settings"
+              style={{
+                width: 32, height: 32, borderRadius: '50%',
+                border: '1px solid var(--border)', background: 'var(--surface-2)',
+                color: 'var(--text-dim)', display: 'grid', placeItems: 'center',
+              }}
+            >
+              <Icon name="settings" size={15} />
+            </button>
+
+            <button
               onClick={onToggleTheme}
               title="Toggle theme"
               style={{
@@ -168,6 +191,21 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
       </aside>
 
       <ToastContainer toasts={toasts} />
+
+      {showSettings && (
+        <RoomSettings
+          room={room}
+          isHost={isHost}
+          currentUsername={room.members.find((m) => m.id === memberId)?.username ?? ''}
+          onRename={(name) => {
+            socket.emit('room:rename_self', { username: name });
+          }}
+          onUpdateSettings={(settings) => {
+            socket.emit('room:update_settings', settings);
+          }}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

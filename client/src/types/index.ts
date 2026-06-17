@@ -27,11 +27,16 @@ export interface ChatMessage {
   username: string;
   text: string;
   sentAt: number;
+  videoTimestamp?: number;
+  type?: 'system';
 }
 
 export interface Room {
   pin: string;
   hostId: string;
+  hidden: boolean;
+  viewerCanManageQueue: boolean;
+  viewerCanControl: boolean;
   members: Member[];
   queue: Video[];
   currentVideoIndex: number;

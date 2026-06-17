@@ -6,7 +6,7 @@ import { Logo } from './Logo';
 import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -385,7 +385,7 @@ const inputStyle: React.CSSProperties = {
 };
 
 export function Landing({ theme, onToggleTheme, onJoined }: Props) {
-  const [mode, setMode] = useState<'choose' | 'rooms' | 'create' | 'join'>('choose');
+  const [mode, setMode] = useState<'choose' | 'rooms' | 'create' | 'visibility' | 'join'>('choose');
   const [username, setUsername] = useState(() => localStorage.getItem('tg-username') ?? '');
   const [pin, setPin] = useState('');
   const [pinRequired, setPinRequired] = useState(true);
@@ -400,7 +400,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   const [loadingRooms, setLoadingRooms] = useState(false);
 
   useEffect(() => {
-    console.log(`Togetherness v${APP_VERSION}`);
+    console.log(`Togetherplay v${APP_VERSION}`);
   }, []);
 
   useEffect(() => {
@@ -431,24 +431,46 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
     return () => { alive = false; clearInterval(interval); };
   }, [mode]);
 
-  function selectRoom(room: { pin: string; memberCount: number }) {
-    if (room.memberCount === 0) {
-      // Empty room — PIN is known, user just needs to enter their name.
-      setPin(room.pin);
-      setPinRequired(false);
-    } else {
-      // Occupied room — user must type the PIN themselves.
-      setPin('');
-      setPinRequired(true);
-    }
+  function selectRoom(room: { pin: string }) {
+    // All listed rooms are public — PIN is known, user just needs to enter their name.
+    setPin(room.pin);
+    setPinRequired(false);
     setError('');
     setMode('join');
+  }
+
+  function goToVisibility() {
+    const trimmed = username.trim();
+    if (!trimmed) { setError('Tell us your name first 🙂'); return; }
+    setError('');
+    setMode('visibility');
+  }
+
+  function submitCreate(hidden: boolean) {
+    const trimmed = username.trim();
+    if (!trimmed) return;
+    localStorage.setItem('tg-username', trimmed);
+    setLoading(true);
+    setError('');
+    const socket = getSocket();
+    const cleanup = () => { socket.off('room:joined'); socket.off('room:error'); };
+    socket.once('room:joined', ({ room, isHost }: { room: Room; isHost: boolean }) => {
+      cleanup();
+      setLoading(false);
+      onJoined(room, isHost, socket.id ?? '');
+    });
+    socket.once('room:error', ({ message }: { message: string }) => {
+      cleanup();
+      setLoading(false);
+      setError(message);
+    });
+    socket.emit('room:create', { username: trimmed, hidden });
   }
 
   function submit() {
     const trimmed = username.trim();
     if (!trimmed) { setError('Tell us your name first 🙂'); return; }
-    if (mode === 'join' && pinRequired && pin.length !== 4) { setError('That PIN needs all 4 digits.'); return; }
+    if (pinRequired && pin.length !== 4) { setError('That PIN needs all 4 digits.'); return; }
 
     localStorage.setItem('tg-username', trimmed);
     setLoading(true);
@@ -469,11 +491,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
       setError(message);
     });
 
-    if (mode === 'create') {
-      socket.emit('room:create', { username: trimmed });
-    } else {
-      socket.emit('room:join', { pin, username: trimmed });
-    }
+    socket.emit('room:join', { pin, username: trimmed });
   }
 
   return (
@@ -581,7 +599,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
             ) : availableRooms.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
                 <p style={{ color: 'var(--text-faint)', fontWeight: 600, fontSize: 14, margin: '0 0 14px' }}>
-                  No active rooms right now.
+                  No public rooms right now.
                 </p>
                 <button onClick={() => setMode('create')} style={{ ...btnPrimary, fontSize: 14 }}>
                   <Icon name="plus" size={16} /> Create one
@@ -635,8 +653,8 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
                             ? `${room.memberNames[0]} is watching`
                             : `${room.memberNames.slice(0, 2).join(', ')}${room.memberCount > 2 ? ` +${room.memberCount - 2}` : ''}`}
                       </div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: room.memberCount === 0 ? 'var(--online)' : 'var(--text-faint)', marginTop: 2 }}>
-                        {room.memberCount === 0 ? 'Join without PIN' : 'PIN required'}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--online)', marginTop: 2 }}>
+                        Join without PIN
                       </div>
                     </div>
 
@@ -646,26 +664,116 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
               </div>
             )}
 
-            {/* Manual PIN fallback */}
-            {availableRooms.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 18, marginTop: 4 }}>
-                <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-faint)', margin: '0 0 10px', textAlign: 'center' }}>
-                  Or enter a PIN manually
+            {/* PIN entry — always visible so hidden rooms can be joined */}
+            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 18, marginTop: availableRooms.length > 0 ? 4 : 18 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-faint)', margin: '0 0 10px', textAlign: 'center' }}>
+                {availableRooms.length > 0 ? 'Or enter a PIN manually' : 'Have a PIN? Enter it here'}
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <PinInput value={pin} onChange={setPin} />
+                <button
+                  onClick={() => { setPinRequired(true); setMode('join'); }}
+                  disabled={pin.length !== 4}
+                  style={{ ...btnPrimary, fontSize: 13, padding: '10px 16px', opacity: pin.length !== 4 ? 0.4 : 1 }}
+                >
+                  Join
+                </button>
+              </div>
+            </div>
+
+            <button onClick={() => { setMode('choose'); setPin(''); }} style={{ ...btnSoft, width: '100%', justifyContent: 'center', marginTop: 14, fontSize: 14 }}>
+              Back
+            </button>
+          </div>
+
+        ) : mode === 'visibility' ? (
+          /* ── Visibility picker ── */
+          <div className="animate-pop-in" style={{
+            width: '100%', maxWidth: 440,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-xl)', padding: 30, boxShadow: 'var(--shadow)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+              <span style={{
+                width: 42, height: 42, borderRadius: 'var(--r-md)',
+                background: 'var(--accent-soft)', color: 'var(--accent)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
+              }}>
+                <Icon name="plus" size={22} />
+              </span>
+              <div>
+                <h2 className="font-display" style={{ fontSize: 24, fontWeight: 600, margin: 0, color: 'var(--text)' }}>
+                  Room visibility
+                </h2>
+                <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-dim)', fontWeight: 600 }}>
+                  Who can find this room?
                 </p>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <PinInput value={pin} onChange={setPin} />
-                  <button
-                    onClick={() => { setPinRequired(true); setMode('join'); }}
-                    disabled={pin.length !== 4}
-                    style={{ ...btnPrimary, fontSize: 13, padding: '10px 16px', opacity: pin.length !== 4 ? 0.4 : 1 }}
-                  >
-                    Join
-                  </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+              <button
+                onClick={() => submitCreate(false)}
+                disabled={loading}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px',
+                  borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)',
+                  background: 'var(--surface-2)', textAlign: 'left', cursor: 'pointer', width: '100%',
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                <span style={{
+                  width: 38, height: 38, borderRadius: 'var(--r-sm)', flexShrink: 0, marginTop: 1,
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  <Icon name="users" size={18} />
+                </span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 3 }}>
+                    Public
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 600, lineHeight: 1.4 }}>
+                    Listed in the room browser. Anyone on this server can join with just their name.
+                  </div>
                 </div>
+              </button>
+
+              <button
+                onClick={() => submitCreate(true)}
+                disabled={loading}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px',
+                  borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)',
+                  background: 'var(--surface-2)', textAlign: 'left', cursor: 'pointer', width: '100%',
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                <span style={{
+                  width: 38, height: 38, borderRadius: 'var(--r-sm)', flexShrink: 0, marginTop: 1,
+                  background: 'rgba(128,128,128,.12)', color: 'var(--text-dim)',
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  <Icon name="lock" size={18} />
+                </span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)', marginBottom: 3 }}>
+                    Hidden
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-dim)', fontWeight: 600, lineHeight: 1.4 }}>
+                    Not listed anywhere. Share your 4-digit PIN to invite friends.
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {error && (
+              <div style={{ fontSize: 13.5, color: 'var(--accent)', fontWeight: 700, background: 'var(--accent-soft)', padding: '9px 13px', borderRadius: 'var(--r-sm)', marginBottom: 14 }}>
+                {error}
               </div>
             )}
 
-            <button onClick={() => { setMode('choose'); setPin(''); }} style={{ ...btnSoft, width: '100%', justifyContent: 'center', marginTop: 14, fontSize: 14 }}>
+            <button onClick={() => { setMode('create'); setError(''); }} style={{ ...btnSoft, width: '100%', justifyContent: 'center', fontSize: 14 }}>
               Back
             </button>
           </div>
@@ -690,7 +798,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
                   {mode === 'create' ? 'Create a room' : 'Join a room'}
                 </h2>
                 <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-dim)', fontWeight: 600 }}>
-                  {mode === 'create' ? "You'll be the host." : pinRequired ? 'Enter the 4-digit PIN.' : 'No PIN needed — room is empty.'}
+                  {mode === 'create' ? "Pick a name, then choose visibility." : pinRequired ? 'Enter the 4-digit PIN.' : 'No PIN needed — just enter your name.'}
                 </p>
               </div>
             </div>
@@ -707,7 +815,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
                   maxLength={32}
                   autoFocus
                   onChange={(e) => setUsername(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && submit()}
+                  onKeyDown={(e) => e.key === 'Enter' && (mode === 'create' ? goToVisibility() : submit())}
                 />
               </label>
 
@@ -731,11 +839,11 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
                   Back
                 </button>
                 <button
-                  onClick={submit}
+                  onClick={mode === 'create' ? goToVisibility : submit}
                   disabled={loading}
                   style={{ ...btnPrimary, flex: 1, justifyContent: 'center', opacity: loading ? 0.6 : 1 }}
                 >
-                  {loading ? 'Connecting…' : mode === 'create' ? 'Create room' : 'Join room'}
+                  {loading ? 'Connecting…' : mode === 'create' ? 'Next' : 'Join room'}
                   {!loading && <Icon name="chevron" size={17} />}
                 </button>
               </div>
