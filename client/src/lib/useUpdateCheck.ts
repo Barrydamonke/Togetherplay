@@ -11,6 +11,16 @@ export interface UpdateState {
   releaseUrl: string | null;
 }
 
+// Module-level shared state so all mounted hook instances stay in sync.
+type Listener = (state: UpdateState) => void;
+const listeners = new Set<Listener>();
+let moduleState: UpdateState | null = null;
+
+function broadcast(state: UpdateState) {
+  moduleState = state;
+  listeners.forEach((l) => l(state));
+}
+
 function parseSemver(v: string): number[] {
   return v.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
 }
@@ -66,8 +76,14 @@ function saveCache(state: UpdateState) {
 
 export function useUpdateCheck(repoUrl?: string) {
   const [state, setState] = useState<UpdateState>(() => {
-    return loadCache() ?? { status: 'checking', lastChecked: null, latestVersion: null, releaseUrl: null };
+    return moduleState ?? loadCache() ?? { status: 'checking', lastChecked: null, latestVersion: null, releaseUrl: null };
   });
+
+  // Subscribe to broadcasts from other hook instances.
+  useEffect(() => {
+    listeners.add(setState);
+    return () => { listeners.delete(setState); };
+  }, []);
 
   const checkingRef = useRef(false);
   const apiUrlRef = useRef(repoUrlToApiUrl(repoUrl ?? ''));
@@ -75,7 +91,7 @@ export function useUpdateCheck(repoUrl?: string) {
   const check = useCallback(async (overrideApiUrl?: string) => {
     if (checkingRef.current) return;
     checkingRef.current = true;
-    setState((prev) => ({ ...prev, status: 'checking' }));
+    broadcast({ ...(moduleState ?? { lastChecked: null, latestVersion: null, releaseUrl: null }), status: 'checking' });
     const apiUrl = overrideApiUrl ?? apiUrlRef.current;
 
     try {
@@ -88,7 +104,7 @@ export function useUpdateCheck(repoUrl?: string) {
           latestVersion: null,
           releaseUrl: null,
         };
-        setState(next);
+        broadcast(next);
         saveCache(next);
         return;
       }
@@ -101,10 +117,10 @@ export function useUpdateCheck(repoUrl?: string) {
       const status = isNewer(latestVersion, __APP_VERSION__) ? 'update-available' : 'up-to-date';
 
       const next: UpdateState = { status, lastChecked: Date.now(), latestVersion, releaseUrl };
-      setState(next);
+      broadcast(next);
       saveCache(next);
     } catch {
-      setState((prev) => ({ ...prev, status: 'error' }));
+      broadcast({ ...(moduleState ?? { lastChecked: null, latestVersion: null, releaseUrl: null }), status: 'error' });
     } finally {
       checkingRef.current = false;
     }
