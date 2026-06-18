@@ -1,3 +1,5 @@
+export type AspectRatio = 'auto' | '16/9' | '4/3' | '2.39/1';
+
 export interface Member {
   id: string;
   username: string;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { PlaybackState } from '../types';
+import { useIsMobile } from '../lib/useIsMobile';
 
 interface SubtitleTrack {
   index: number;
@@ -84,6 +85,9 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const [activeCue, setActiveCue] = useState('');
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const subtitleCuesRef = useRef<Cue[]>([]);
+
+  const isMobile = useIsMobile();
+  const nativeHeight = isMobile && !isFullscreen;
 
   // Refs so event listeners (set up with [streamUrl] dep) always see current values.
   const playbackRef = useRef(playback);
@@ -331,7 +335,13 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
 
   if (!streamUrl) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', color: 'var(--text-faint)', fontSize: 15, fontWeight: 600 }}>
+      <div style={{
+        width: '100%',
+        height: nativeHeight ? 'auto' : '100%',
+        aspectRatio: nativeHeight ? '16/9' : undefined,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#000', color: 'var(--text-faint)', fontSize: 15, fontWeight: 600,
+      }}>
         No video selected
       </div>
     );
@@ -340,14 +350,15 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   return (
     <div
       ref={containerRef}
-      style={{ position: 'relative', width: '100%', height: '100%', background: '#000' }}
+      style={{ position: 'relative', width: '100%', height: nativeHeight ? 'auto' : '100%', background: '#000' }}
       onMouseMove={resetHideTimer}
       onMouseEnter={resetHideTimer}
       onMouseLeave={() => isPlaying && setControlsVisible(false)}
+      onTouchStart={resetHideTimer}
     >
       <video
         ref={videoRef}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: nativeHeight ? 'auto' : '100%', display: 'block' }}
         onClick={handlePlayPause}
         onError={(e) => {
           const code = (e.target as HTMLVideoElement).error?.code;
@@ -372,7 +383,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         <div
           onClick={handleSeekClick}
           style={{
-            width: '100%', height: 6, borderRadius: 99,
+            width: '100%', height: 8, borderRadius: 99,
             background: 'rgba(255,255,255,.24)', position: 'relative',
             cursor: canControl ? 'pointer' : 'default',
           }}
@@ -499,6 +510,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
               step="0.02"
               value={muted ? 0 : volume}
               onChange={handleVolumeChange}
+              className="video-volume-slider"
               style={{ width: 80, cursor: 'pointer', accentColor: 'var(--accent)' }}
             />
           </div>

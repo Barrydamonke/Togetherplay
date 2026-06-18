@@ -5,6 +5,7 @@ import { Icon } from './Icon';
 interface Props {
   messages: ChatMessage[];
   currentMemberId: string;
+  isMobile?: boolean;
   onSend: (text: string) => void;
 }
 
@@ -20,7 +21,7 @@ function formatVideoTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function Chat({ messages, currentMemberId, onSend }: Props) {
+export function Chat({ messages, currentMemberId, isMobile, onSend }: Props) {
   const [text, setText] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -39,8 +40,9 @@ export function Chat({ messages, currentMemberId, onSend }: Props) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
-      height: 'clamp(180px, 30vh, 248px)',
+      height: isMobile ? 'clamp(220px, 36vh, 320px)' : 'clamp(180px, 30vh, 248px)',
       borderTop: '1px solid var(--border)',
+      flexShrink: 0,
     }}>
       {/* Section label */}
       <div style={{

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Room as RoomType, Video, PlaybackState, ChatMessage, Member } from '../types';
+import { Room as RoomType, Video, PlaybackState, ChatMessage, Member, AspectRatio } from '../types';
 import { getSocket } from '../lib/socket';
 import { VideoPlayer } from './VideoPlayer';
 import { Chat } from './Chat';
@@ -8,6 +8,7 @@ import { RoomSettings } from './RoomSettings';
 import { Icon } from './Icon';
 import { Logo } from './Logo';
 import { useToasts, ToastContainer } from './Toast';
+import { useIsMobile } from '../lib/useIsMobile';
 
 interface Props {
   initialRoom: RoomType;
@@ -23,6 +24,24 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
   const [showSettings, setShowSettings] = useState(false);
   const { toasts, addToast } = useToasts();
   const socket = getSocket();
+  const isMobile = useIsMobile();
+
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>(
+    () => (localStorage.getItem('tg-aspect-ratio') as AspectRatio) ?? 'auto',
+  );
+
+  function handleSetAspectRatio(ratio: AspectRatio) {
+    setAspectRatio(ratio);
+    localStorage.setItem('tg-aspect-ratio', ratio);
+  }
+
+  const RATIO_NUMS: Record<Exclude<AspectRatio, 'auto'>, [number, number]> = {
+    '16/9':   [16, 9],
+    '4/3':    [4, 3],
+    '2.39/1': [2.39, 1],
+  };
+  const showRatioWrapper = !isMobile && aspectRatio !== 'auto';
+  const ratioNums = showRatioWrapper ? RATIO_NUMS[aspectRatio as Exclude<AspectRatio, 'auto'>] : null;
 
   // Derive host status from live room state so it updates when host changes.
   const isHost = room.hostId === memberId;
@@ -75,28 +94,65 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
   const currentVideo = room.currentVideoIndex >= 0 ? room.queue[room.currentVideoIndex] : null;
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100%', overflow: 'hidden' }}>
       {/* Video side */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flex: 1, minHeight: 0, background: '#000' }}>
-          <VideoPlayer
-            streamUrl={currentVideo?.streamUrl ?? null}
-            isHls={currentVideo?.isHls ?? true}
-            knownDuration={currentVideo?.duration}
-            jellyfinId={currentVideo?.jellyfinId}
-            playback={room.playback}
-            isHost={isHost}
-            canControl={isHost || room.viewerCanControl}
-            onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
-            onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
-            onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
-            onEnded={() => {
-              const nextIndex = room.currentVideoIndex + 1;
-              if (nextIndex < room.queue.length) {
-                socket.emit('queue:set_current', { index: nextIndex });
-              }
-            }}
-          />
+      <div style={isMobile
+        ? { width: '100%', flexShrink: 0, display: 'flex', flexDirection: 'column' }
+        : { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }
+      }>
+        <div
+          style={isMobile
+            ? { width: '100%', background: '#000' }
+            : showRatioWrapper
+              ? { flex: 1, minHeight: 0, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+              : { flex: 1, minHeight: 0, background: '#000' }
+          }
+          className={showRatioWrapper ? 'video-ratio-outer' : undefined}
+        >
+          {showRatioWrapper && ratioNums ? (
+            <div style={{
+              width: `min(100cqw, calc(100cqh * ${ratioNums[0]} / ${ratioNums[1]}))`,
+              height: `min(100cqh, calc(100cqw * ${ratioNums[1]} / ${ratioNums[0]}))`,
+            }}>
+              <VideoPlayer
+                streamUrl={currentVideo?.streamUrl ?? null}
+                isHls={currentVideo?.isHls ?? true}
+                knownDuration={currentVideo?.duration}
+                jellyfinId={currentVideo?.jellyfinId}
+                playback={room.playback}
+                isHost={isHost}
+                canControl={isHost || room.viewerCanControl}
+                onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
+                onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
+                onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
+                onEnded={() => {
+                  const nextIndex = room.currentVideoIndex + 1;
+                  if (nextIndex < room.queue.length) {
+                    socket.emit('queue:set_current', { index: nextIndex });
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <VideoPlayer
+              streamUrl={currentVideo?.streamUrl ?? null}
+              isHls={currentVideo?.isHls ?? true}
+              knownDuration={currentVideo?.duration}
+              jellyfinId={currentVideo?.jellyfinId}
+              playback={room.playback}
+              isHost={isHost}
+              canControl={isHost || room.viewerCanControl}
+              onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
+              onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
+              onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
+              onEnded={() => {
+                const nextIndex = room.currentVideoIndex + 1;
+                if (nextIndex < room.queue.length) {
+                  socket.emit('queue:set_current', { index: nextIndex });
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Info bar below player */}
@@ -122,11 +178,18 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
         )}
       </div>
 
-      {/* Right panel */}
-      <aside style={{
-        width: 332, flexShrink: 0, display: 'flex', flexDirection: 'column',
-        borderLeft: '1px solid var(--border)', background: 'var(--surface)',
-      }}>
+      {/* Right / bottom panel */}
+      <aside style={isMobile
+        ? {
+            width: '100%', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column',
+            borderTop: '1px solid var(--border)', background: 'var(--surface)',
+            overflowY: 'auto', overflowX: 'hidden',
+          }
+        : {
+            width: 332, flexShrink: 0, display: 'flex', flexDirection: 'column',
+            borderLeft: '1px solid var(--border)', background: 'var(--surface)',
+          }
+      }>
         {/* Panel header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -177,6 +240,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
         <Sidebar
           room={room}
           isHost={isHost}
+          isMobile={isMobile}
           onSetCurrentVideo={(index) => socket.emit('queue:set_current', { index })}
           onRemoveFromQueue={(index) => socket.emit('queue:remove', { index })}
           onAddVideo={(video) => socket.emit('queue:add', { video })}
@@ -186,6 +250,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
         <Chat
           messages={room.chat}
           currentMemberId={memberId}
+          isMobile={isMobile}
           onSend={(text) => socket.emit('chat:message', { text })}
         />
       </aside>
@@ -197,6 +262,8 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           room={room}
           isHost={isHost}
           currentUsername={room.members.find((m) => m.id === memberId)?.username ?? ''}
+          aspectRatio={aspectRatio}
+          onSetAspectRatio={handleSetAspectRatio}
           onRename={(name) => {
             socket.emit('room:rename_self', { username: name });
           }}

@@ -5,8 +5,9 @@ import { Icon } from './Icon';
 import { Logo } from './Logo';
 import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
+import { useIsMobile } from '../lib/useIsMobile';
 
-const APP_VERSION = '1.2.4';
+const APP_VERSION = '1.3';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -113,7 +114,7 @@ function PosterCard({ itemId, name, bg }: { itemId?: string; name: string; bg: s
   );
 }
 
-function FloatingPosters({ taglineCount, maxExtras }: { taglineCount: number; maxExtras: number }) {
+function FloatingPosters({ taglineCount, maxExtras, isMobile }: { taglineCount: number; maxExtras: number; isMobile: boolean }) {
   const [items, setItems] = useState<Array<{ Id: string; Name: string }>>([]);
   const [extras, setExtras] = useState<SlidingPoster[]>([]);
   const deckRef = useRef<Array<{ Id: string; Name: string }>>([]);
@@ -194,8 +195,8 @@ function FloatingPosters({ taglineCount, maxExtras }: { taglineCount: number; ma
 
   return (
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      {/* Fixed background posters */}
-      {POSTERS.map((p, i) => {
+      {/* Fixed background posters — hidden on mobile to avoid obscuring content */}
+      {!isMobile && POSTERS.map((p, i) => {
         const item = items[i];
         return (
           <div
@@ -328,7 +329,7 @@ function WatchingNow() {
   );
 }
 
-function PinInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function PinInput({ value, onChange, compact }: { value: string; onChange: (v: string) => void; compact?: boolean }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   function setDigit(i: number, d: string) {
@@ -340,7 +341,7 @@ function PinInput({ value, onChange }: { value: string; onChange: (v: string) =>
   }
 
   return (
-    <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', gap: compact ? 7 : 10, justifyContent: 'center' }}>
       {[0, 1, 2, 3].map((i) => (
         <input
           key={i}
@@ -353,8 +354,8 @@ function PinInput({ value, onChange }: { value: string; onChange: (v: string) =>
             if (e.key === 'Backspace' && !value[i] && i > 0) refs.current[i - 1]?.focus();
           }}
           style={{
-            width: 58, height: 66, textAlign: 'center',
-            fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 600,
+            width: compact ? 48 : 58, height: compact ? 56 : 66, textAlign: 'center',
+            fontFamily: 'var(--font-display)', fontSize: compact ? 24 : 28, fontWeight: 600,
             borderRadius: 'var(--r-md)',
             border: `1.5px solid ${value[i] ? 'var(--accent)' : 'var(--border)'}`,
             background: 'var(--surface-2)', color: 'var(--text)', outline: 'none',
@@ -398,6 +399,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   const [posterUnlocked, setPosterUnlocked] = useState(false);
   const [availableRooms, setAvailableRooms] = useState<Array<{ pin: string; memberCount: number; memberNames: string[] }>>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     console.log(`Togetherplay v${APP_VERSION}`);
@@ -496,7 +498,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
 
   return (
     <div style={{ position: 'relative', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      <FloatingPosters taglineCount={taglineCount} maxExtras={posterUnlocked ? 100 : 12} />
+      <FloatingPosters taglineCount={taglineCount} maxExtras={isMobile ? 0 : (posterUnlocked ? 100 : 12)} isMobile={isMobile} />
 
       <header style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '22px 28px' }}>
         {/* Wordmark */}
@@ -505,21 +507,24 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Admin */}
           <button onClick={() => setShowAdmin(true)} title="Admin panel" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 13px',
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            padding: isMobile ? '8px' : '8px 13px',
             borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface)',
             color: 'var(--text-faint)', fontWeight: 700, fontSize: 13,
           }}>
-            <Icon name="lock" size={14} /> Admin
+            <Icon name="lock" size={14} />
+            {!isMobile && 'Admin'}
           </button>
 
           {/* Theme toggle */}
           <button onClick={onToggleTheme} title="Toggle light / dark" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px',
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: isMobile ? '8px' : '8px 14px',
             borderRadius: 99, border: '1px solid var(--border)', background: 'var(--surface)',
             color: 'var(--text-dim)', fontWeight: 700, fontSize: 13, boxShadow: 'var(--shadow)',
           }}>
             <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />
-            {theme === 'dark' ? 'Light' : 'Dark'}
+            {!isMobile && (theme === 'dark' ? 'Light' : 'Dark')}
           </button>
         </div>
       </header>
@@ -669,12 +674,12 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
               <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-faint)', margin: '0 0 10px', textAlign: 'center' }}>
                 {availableRooms.length > 0 ? 'Or enter a PIN manually' : 'Have a PIN? Enter it here'}
               </p>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <PinInput value={pin} onChange={setPin} />
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <PinInput value={pin} onChange={setPin} compact={isMobile} />
                 <button
                   onClick={() => { setPinRequired(true); setMode('join'); }}
                   disabled={pin.length !== 4}
-                  style={{ ...btnPrimary, fontSize: 13, padding: '10px 16px', opacity: pin.length !== 4 ? 0.4 : 1 }}
+                  style={{ ...btnPrimary, fontSize: 13, padding: isMobile ? '10px 12px' : '10px 16px', opacity: pin.length !== 4 ? 0.4 : 1, flexShrink: 0 }}
                 >
                   Join
                 </button>

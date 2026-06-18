@@ -5,7 +5,7 @@ const router = Router();
 
 const JELLYFIN_HEADERS = {
   'X-Emby-Token': '',
-  'User-Agent': 'Togetherplay/1.2.4',
+  'User-Agent': 'Togetherplay/1.3',
 };
 
 async function jellyfinFetch(path: string): Promise<unknown> {

@@ -6,6 +6,7 @@ import { Icon } from './Icon';
 interface Props {
   room: Room;
   isHost: boolean;
+  isMobile?: boolean;
   onSetCurrentVideo: (index: number) => void;
   onRemoveFromQueue: (index: number) => void;
   onAddVideo: (video: Video) => void;
@@ -49,14 +50,17 @@ function CopyPin({ pin }: { pin: string }) {
   );
 }
 
-export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, onAddVideo, onReorderQueue }: Props) {
+export function Sidebar({ room, isHost, isMobile, onSetCurrentVideo, onRemoveFromQueue, onAddVideo, onReorderQueue }: Props) {
   const [showBrowser, setShowBrowser] = useState(false);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const dragIndexRef = useRef<number | null>(null);
   const canManageQueue = isHost || room.viewerCanManageQueue;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div style={isMobile
+      ? { display: 'flex', flexDirection: 'column' }
+      : { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }
+    }>
       {/* PIN */}
       <div style={{ padding: '14px 16px 6px' }}>
         <CopyPin pin={room.pin} />
@@ -102,7 +106,10 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
       </div>
 
       {/* Queue */}
-      <div style={{ borderTop: '1px solid var(--border-soft)', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={isMobile
+        ? { borderTop: '1px solid var(--border-soft)', display: 'flex', flexDirection: 'column' }
+        : { borderTop: '1px solid var(--border-soft)', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+      }>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 16px', height: 34, flexShrink: 0,
@@ -125,7 +132,10 @@ export function Sidebar({ room, isHost, onSetCurrentVideo, onRemoveFromQueue, on
           )}
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={isMobile
+          ? { maxHeight: 260, overflowY: 'auto', overflowX: 'hidden', padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }
+          : { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 4 }
+        }>
           {room.queue.length === 0 && (
             <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 13.5, fontWeight: 600, padding: '20px 0' }}>
               {canManageQueue ? 'Add something to watch.' : "Queue's empty."}

@@ -1,11 +1,20 @@
 import { useState, CSSProperties } from 'react';
-import { Room } from '../types';
+import { Room, AspectRatio } from '../types';
 import { Icon } from './Icon';
+
+const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
+  { value: 'auto',    label: 'Auto' },
+  { value: '16/9',   label: '16 : 9' },
+  { value: '4/3',    label: '4 : 3' },
+  { value: '2.39/1', label: '2.39 : 1' },
+];
 
 interface Props {
   room: Room;
   isHost: boolean;
   currentUsername: string;
+  aspectRatio: AspectRatio;
+  onSetAspectRatio: (ratio: AspectRatio) => void;
   onRename: (name: string) => void;
   onUpdateSettings: (settings: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean }>) => void;
   onClose: () => void;
@@ -63,7 +72,7 @@ function SettingRow({ label, description, on, onToggle }: { label: string; descr
   );
 }
 
-export function RoomSettings({ room, isHost, currentUsername, onRename, onUpdateSettings, onClose }: Props) {
+export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSetAspectRatio, onRename, onUpdateSettings, onClose }: Props) {
   const [name, setName] = useState(currentUsername);
   const [nameSaved, setNameSaved] = useState(false);
 
@@ -158,6 +167,39 @@ export function RoomSettings({ room, isHost, currentUsername, onRename, onUpdate
                 {nameSaved ? 'Saved!' : 'Save'}
               </button>
             </div>
+          </section>
+
+          {/* Display settings — per-user, local only */}
+          <section>
+            <p style={sectionHead}><Icon name="play" size={13} /> Display</p>
+            <label style={labelCap}>Player aspect ratio</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {ASPECT_RATIOS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => onSetAspectRatio(value)}
+                  style={{
+                    flex: 1,
+                    padding: '9px 4px',
+                    borderRadius: 'var(--r-sm)',
+                    border: `1.5px solid ${aspectRatio === value ? 'var(--accent)' : 'var(--border)'}`,
+                    background: aspectRatio === value ? 'var(--accent-soft)' : 'var(--surface-2)',
+                    color: aspectRatio === value ? 'var(--accent)' : 'var(--text-dim)',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
+                    transition: 'border-color .15s, background .15s, color .15s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-faint)', fontWeight: 600 }}>
+              {aspectRatio === 'auto'
+                ? 'The player resizes to match each video\'s native aspect ratio.'
+                : `Forces a ${aspectRatio} frame. Other ratios will letterbox or pillarbox.`}
+            </p>
           </section>
 
           {/* Host-only room settings */}
