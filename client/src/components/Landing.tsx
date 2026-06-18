@@ -7,7 +7,7 @@ import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
 import { useIsMobile } from '../lib/useIsMobile';
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.3.1';
 
 interface Props {
   theme: 'dark' | 'light';

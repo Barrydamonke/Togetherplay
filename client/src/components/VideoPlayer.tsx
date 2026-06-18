@@ -278,9 +278,15 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    const handler = () => setIsFullscreen(
+      !!(document.fullscreenElement || (document as any).webkitFullscreenElement),
+    );
     document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
+    document.addEventListener('webkitfullscreenchange', handler);
+    return () => {
+      document.removeEventListener('fullscreenchange', handler);
+      document.removeEventListener('webkitfullscreenchange', handler);
+    };
   }, []);
 
   // Controls
@@ -325,9 +331,17 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
 
   const toggleFullscreen = () => {
     const el = containerRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) el.requestFullscreen();
-    else document.exitFullscreen();
+    const video = videoRef.current;
+    if (!el || !video) return;
+    const inFs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    if (!inFs) {
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
+      else if ((video as any).webkitEnterFullscreen) (video as any).webkitEnterFullscreen();
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if ((document as any).webkitExitFullscreen) (document as any).webkitExitFullscreen();
+    }
   };
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -358,6 +372,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     >
       <video
         ref={videoRef}
+        playsInline
         style={{ width: '100%', height: nativeHeight ? 'auto' : '100%', display: 'block' }}
         onClick={handlePlayPause}
         onError={(e) => {

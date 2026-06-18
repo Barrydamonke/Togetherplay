@@ -5,7 +5,7 @@ const router = Router();
 
 const JELLYFIN_HEADERS = {
   'X-Emby-Token': '',
-  'User-Agent': 'Togetherplay/1.3',
+  'User-Agent': 'Togetherplay/1.3.1',
 };
 
 async function jellyfinFetch(path: string): Promise<unknown> {
@@ -61,16 +61,32 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
         ETag?: string;
         SupportsDirectStream?: boolean;
         Container?: string;
+        MediaStreams?: Array<{ Type: string; Codec?: string; IsDefault?: boolean }>;
       }>;
     };
 
     const source = item.MediaSources?.[0];
     const mediaSourceId = source?.Id ?? itemId;
 
+    // Video codecs not universally supported across all browsers/devices.
+    // VP9 and VP8 are unsupported on iOS Safari; AV1 requires very recent hardware on iOS.
+    const BROWSER_UNSUPPORTED_VIDEO = new Set(['vp9', 'vp8', 'av1']);
+    const videoStreams = (source?.MediaStreams ?? []).filter((s) => s.Type === 'Video');
+    const defaultVideo = videoStreams.find((s) => s.IsDefault) ?? videoStreams[0];
+    const videoCodec = defaultVideo?.Codec?.toLowerCase() ?? '';
+    const forceVideoTranscode = BROWSER_UNSUPPORTED_VIDEO.has(videoCodec);
+
+    // Audio codecs not supported by any desktop browser via MSE.
+    const BROWSER_UNSUPPORTED_AUDIO = new Set(['eac3', 'truehd', 'dts', 'dca', 'ac3', 'mlp']);
+    const audioStreams = (source?.MediaStreams ?? []).filter((s) => s.Type === 'Audio');
+    const defaultAudio = audioStreams.find((s) => s.IsDefault) ?? audioStreams[0];
+    const audioCodec = defaultAudio?.Codec?.toLowerCase() ?? '';
+    const forceAudioTranscode = BROWSER_UNSUPPORTED_AUDIO.has(audioCodec);
+
     let streamUrl: string;
     let isHls: boolean;
 
-    if (source?.SupportsDirectStream) {
+    if (source?.SupportsDirectStream && !forceVideoTranscode && !forceAudioTranscode) {
       streamUrl =
         `${jellyfinUrl}/Videos/${itemId}/stream` +
         `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` +
@@ -78,14 +94,17 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
       isHls = false;
     } else {
       const tag = source?.ETag ? `&Tag=${encodeURIComponent(source.ETag)}` : '';
+      // AudioCodec=aac / VideoCodec=h264 tell Jellyfin to transcode incompatible
+      // tracks. Jellyfin skips transcoding any track that is already compatible.
+      const videoParam = forceVideoTranscode ? '&VideoCodec=h264' : '';
       streamUrl =
         `${jellyfinUrl}/Videos/${itemId}/master.m3u8` +
         `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` +
-        `&api_key=${jellyfinApiKey}${tag}`;
+        `&api_key=${jellyfinApiKey}${tag}&AudioCodec=aac${videoParam}`;
       isHls = true;
     }
 
-    console.log(`stream-url for ${itemId}: isHls=${isHls} url=${streamUrl}`);
+    console.log(`stream-url for ${itemId}: isHls=${isHls}, videoCodec=${videoCodec || 'unknown'}, audioCodec=${audioCodec || 'unknown'}, forceVideoTranscode=${forceVideoTranscode}, forceAudioTranscode=${forceAudioTranscode}`);
     res.json({ streamUrl, isHls });
   } catch (err) {
     console.error('stream-url error:', err);
