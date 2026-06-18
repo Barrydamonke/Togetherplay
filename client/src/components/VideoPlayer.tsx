@@ -70,6 +70,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [streamError, setStreamError] = useState('');
+  const [needsGesture, setNeedsGesture] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(knownDuration ?? 0);
   const [volume, setVolume] = useState(1);
@@ -134,6 +135,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     if (!video || !streamUrl) return;
 
     setStreamError('');
+    setNeedsGesture(false);
     setIsBuffering(true);
     hlsRef.current?.destroy();
     hlsRef.current = null;
@@ -189,8 +191,15 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
             try {
               await video.play();
             } catch (err) {
-              // AbortError fires when a new load interrupts play() — onCanPlay retries, so ignore it.
-              if ((err as Error).name !== 'AbortError') {
+              const name = (err as Error).name;
+              if (name === 'AbortError') {
+                // A new load interrupted play() — onCanPlay retries, so ignore it.
+              } else if (name === 'NotAllowedError') {
+                // iOS/iPadOS Safari blocks autoplay until a real user gesture.
+                // Show a tap-to-start prompt rather than an error overlay.
+                setNeedsGesture(true);
+                setControlsVisible(true);
+              } else {
                 console.error('video.play() rejected:', err);
                 setStreamError(`Playback blocked: ${(err as Error).message}. Try clicking the play button.`);
               }
@@ -235,7 +244,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     };
     const onWaiting = () => setIsBuffering(true);
     const onVolumeChange = () => { setVolume(video.volume); setMuted(video.muted); };
-    const onPlayEvt = () => { setIsPlaying(true); setIsBuffering(false); };
+    const onPlayEvt = () => { setIsPlaying(true); setIsBuffering(false); setNeedsGesture(false); };
     const onPauseEvt = () => setIsPlaying(false);
     const onEndedEvt = () => {
       if (isHostRef.current) onEndedRef.current?.();
@@ -290,6 +299,17 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   }, []);
 
   // Controls
+
+  const handleUnblockAutoplay = async () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      await video.play();
+      setNeedsGesture(false);
+    } catch {
+      // Still blocked — leave prompt visible
+    }
+  };
 
   const handlePlayPause = () => {
     if (!canControl) return;
@@ -598,6 +618,30 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         }} />
         {isPlaying ? 'In sync' : 'Paused'}
       </div>
+
+      {needsGesture && (
+        <div
+          onClick={handleUnblockAutoplay}
+          style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)', cursor: 'pointer',
+          }}
+        >
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(8px)',
+            display: 'grid', placeItems: 'center', marginBottom: 14,
+          }}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="white">
+              <polygon points="6 4 20 12 6 20 6 4" />
+            </svg>
+          </div>
+          <p style={{ color: '#fff', fontWeight: 700, fontSize: 16, margin: 0, textShadow: '0 1px 4px rgba(0,0,0,.5)' }}>
+            Tap to start
+          </p>
+        </div>
+      )}
 
       {streamError && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.8)', padding: 24, pointerEvents: 'none' }}>
