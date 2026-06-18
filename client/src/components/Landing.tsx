@@ -6,7 +6,7 @@ import { Logo } from './Logo';
 import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
 
-const APP_VERSION = '1.2.3';
+const APP_VERSION = '1.2.4';
 
 interface Props {
   theme: 'dark' | 'light';
