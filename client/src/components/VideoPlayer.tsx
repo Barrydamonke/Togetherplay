@@ -147,8 +147,13 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         hlsRef.current = hls;
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (data.fatal) {
-            setStreamError(`HLS error (${data.details}): ${data.type}`);
+            const status = (data as any).response?.code ? ` — HTTP ${(data as any).response.code}` : '';
             console.error('HLS fatal error', data);
+            setStreamError(`HLS error (${data.details}): ${data.type}${status}`);
+          } else {
+            const code = (data as any).response?.code;
+            const url = (data as any).response?.url ?? (data as any).url ?? '';
+            console.warn(`HLS non-fatal: ${data.details}`, code ?? '', url);
           }
         });
         hls.loadSource(streamUrl);

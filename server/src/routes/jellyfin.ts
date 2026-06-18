@@ -5,7 +5,7 @@ const router = Router();
 
 const JELLYFIN_HEADERS = {
   'X-Emby-Token': '',
-  'User-Agent': 'Togetherplay/1.3.1',
+  'User-Agent': 'Togetherplay/1.3.2',
 };
 
 async function jellyfinFetch(path: string): Promise<unknown> {
@@ -61,7 +61,7 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
         ETag?: string;
         SupportsDirectStream?: boolean;
         Container?: string;
-        MediaStreams?: Array<{ Type: string; Codec?: string; IsDefault?: boolean }>;
+        MediaStreams?: Array<{ Type: string; Codec?: string; IsDefault?: boolean; BitRate?: number }>;
       }>;
     };
 
@@ -75,6 +75,14 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
     const defaultVideo = videoStreams.find((s) => s.IsDefault) ?? videoStreams[0];
     const videoCodec = defaultVideo?.Codec?.toLowerCase() ?? '';
     const forceVideoTranscode = BROWSER_UNSUPPORTED_VIDEO.has(videoCodec);
+
+    // When transcoding video, derive a target bitrate from the source.
+    // h264_vaapi in VBR mode requires a non-zero -b:v; without it Jellyfin passes
+    // -b:v 0 and ffmpeg immediately aborts with "Bitrate must be set for VBR RC mode."
+    const sourceVideoBitrate = defaultVideo?.BitRate ?? 0;
+    const targetVideoBitrate = sourceVideoBitrate > 0
+      ? Math.min(Math.max(sourceVideoBitrate * 2, 4_000_000), 20_000_000)
+      : 8_000_000;
 
     // Audio codecs not supported by any desktop browser via MSE.
     const BROWSER_UNSUPPORTED_AUDIO = new Set(['eac3', 'truehd', 'dts', 'dca', 'ac3', 'mlp']);
@@ -96,7 +104,7 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
       const tag = source?.ETag ? `&Tag=${encodeURIComponent(source.ETag)}` : '';
       // AudioCodec=aac / VideoCodec=h264 tell Jellyfin to transcode incompatible
       // tracks. Jellyfin skips transcoding any track that is already compatible.
-      const videoParam = forceVideoTranscode ? '&VideoCodec=h264' : '';
+      const videoParam = forceVideoTranscode ? `&VideoCodec=h264&VideoBitRate=${targetVideoBitrate}` : '';
       streamUrl =
         `${jellyfinUrl}/Videos/${itemId}/master.m3u8` +
         `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` +
