@@ -94,7 +94,11 @@ router.get('/stream-url/:itemId', async (req: Request, res: Response) => {
     let streamUrl: string;
     let isHls: boolean;
 
-    if (source?.SupportsDirectStream && !forceVideoTranscode && !forceAudioTranscode) {
+    // Discord Activity iframe enforces a strict media-src CSP that blocks direct Jellyfin URLs.
+    // When forceHls=1, skip direct stream and always serve HLS so hls.js (XHR-based) handles it.
+    const forceHlsParam = req.query.forceHls === '1';
+
+    if (!forceHlsParam && source?.SupportsDirectStream && !forceVideoTranscode && !forceAudioTranscode) {
       streamUrl =
         `${jellyfinUrl}/Videos/${itemId}/stream` +
         `?MediaSourceId=${encodeURIComponent(mediaSourceId)}` +

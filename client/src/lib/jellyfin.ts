@@ -29,7 +29,11 @@ export async function fetchItems(params: {
 }
 
 export async function getStreamUrl(jellyfinId: string): Promise<{ streamUrl: string; isHls: boolean }> {
-  const res = await fetch(`/api/jellyfin/stream-url/${jellyfinId}`);
+  // Inside Discord's Activity iframe, media-src CSP blocks direct Jellyfin URLs.
+  // Force HLS so hls.js fetches segments via XHR (which patchUrlMappings intercepts)
+  // rather than setting video.src directly to the cross-origin stream URL.
+  const forceHls = window.location.hostname.endsWith('.discordapp.com');
+  const res = await fetch(`/api/jellyfin/stream-url/${jellyfinId}${forceHls ? '?forceHls=1' : ''}`);
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(err.error ?? 'Failed to get stream URL');
