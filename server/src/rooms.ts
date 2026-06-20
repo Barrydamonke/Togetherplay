@@ -31,7 +31,7 @@ export function createRoom(hostId: string, hostUsername: string, hidden = false)
 
 export function updateRoomSettings(
   pin: string,
-  settings: Partial<Pick<Room, 'hidden' | 'viewerCanManageQueue' | 'viewerCanControl'>>,
+  settings: Partial<Pick<Room, 'hidden' | 'viewerCanManageQueue' | 'viewerCanControl' | 'idleGameUrl'>>,
 ): Room | null {
   const room = rooms.get(pin);
   if (!room) return null;

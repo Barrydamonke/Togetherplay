@@ -5,7 +5,7 @@ const router = Router();
 
 const JELLYFIN_HEADERS = {
   'X-Emby-Token': '',
-  'User-Agent': 'Togetherplay/1.3.2',
+  'User-Agent': 'Togetherplay/1.3.3',
 };
 
 async function jellyfinFetch(path: string): Promise<unknown> {
@@ -201,6 +201,87 @@ router.get('/subtitles/:itemId/:trackIndex', async (req: Request, res: Response)
     res.send(text);
   } catch {
     res.status(500).send('Error fetching subtitles');
+  }
+});
+
+// Returns structured codec / format info for the video stats overlay.
+router.get('/media-info/:itemId', async (req: Request, res: Response) => {
+  const { itemId } = req.params;
+  const { jellyfinUserId } = getConfig();
+  try {
+    const item = await jellyfinFetch(
+      `/Users/${jellyfinUserId}/Items/${itemId}?Fields=MediaSources`
+    ) as {
+      MediaSources?: Array<{
+        Container?: string;
+        SupportsDirectStream?: boolean;
+        MediaStreams?: Array<{
+          Type: string;
+          Codec?: string;
+          Profile?: string;
+          Width?: number;
+          Height?: number;
+          AverageFrameRate?: number;
+          RealFrameRate?: number;
+          BitRate?: number;
+          BitDepth?: number;
+          ColorSpace?: string;
+          ColorTransfer?: string;
+          ColorPrimaries?: string;
+          PixelFormat?: string;
+          Channels?: number;
+          ChannelLayout?: string;
+          SampleRate?: number;
+          IsDefault?: boolean;
+        }>;
+      }>;
+    };
+
+    const source = item.MediaSources?.[0];
+    const streams = source?.MediaStreams ?? [];
+
+    const BROWSER_UNSUPPORTED_VIDEO = new Set(['vp9', 'vp8', 'av1']);
+    const BROWSER_UNSUPPORTED_AUDIO = new Set(['eac3', 'truehd', 'dts', 'dca', 'ac3', 'mlp']);
+
+    const videoStream = streams.find((s) => s.Type === 'Video');
+    const audioStream = streams.find((s) => s.IsDefault && s.Type === 'Audio')
+      ?? streams.find((s) => s.Type === 'Audio');
+
+    const videoCodec = videoStream?.Codec?.toLowerCase() ?? '';
+    const audioCodec = audioStream?.Codec?.toLowerCase() ?? '';
+
+    res.json({
+      container: source?.Container ?? null,
+      isDirectStream: !!(
+        source?.SupportsDirectStream
+        && !BROWSER_UNSUPPORTED_VIDEO.has(videoCodec)
+        && !BROWSER_UNSUPPORTED_AUDIO.has(audioCodec)
+      ),
+      isVideoTranscoded: BROWSER_UNSUPPORTED_VIDEO.has(videoCodec),
+      isAudioTranscoded: BROWSER_UNSUPPORTED_AUDIO.has(audioCodec),
+      video: videoStream ? {
+        codec: videoStream.Codec ?? null,
+        profile: videoStream.Profile ?? null,
+        width: videoStream.Width ?? null,
+        height: videoStream.Height ?? null,
+        fps: videoStream.RealFrameRate ?? videoStream.AverageFrameRate ?? null,
+        bitrate: videoStream.BitRate ?? null,
+        bitDepth: videoStream.BitDepth ?? null,
+        colorSpace: videoStream.ColorSpace ?? null,
+        colorTransfer: videoStream.ColorTransfer ?? null,
+        pixelFormat: videoStream.PixelFormat ?? null,
+      } : null,
+      audio: audioStream ? {
+        codec: audioStream.Codec ?? null,
+        profile: audioStream.Profile ?? null,
+        channels: audioStream.Channels ?? null,
+        channelLayout: audioStream.ChannelLayout ?? null,
+        sampleRate: audioStream.SampleRate ?? null,
+        bitrate: audioStream.BitRate ?? null,
+      } : null,
+    });
+  } catch {
+    res.status(500).json({ error: 'Failed to fetch media info' });
   }
 });
 

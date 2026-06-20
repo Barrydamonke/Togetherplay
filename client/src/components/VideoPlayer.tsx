@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { PlaybackState } from '../types';
+import { PlaybackState, JellyfinMediaInfo } from '../types';
 import { useIsMobile } from '../lib/useIsMobile';
+
+function fmtBitrate(bps: number): string {
+  if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;
+  if (bps >= 1_000) return `${Math.round(bps / 1_000)} kbps`;
+  return `${bps} bps`;
+}
 
 interface SubtitleTrack {
   index: number;
@@ -49,6 +55,9 @@ interface Props {
   onPause: (timestamp: number) => void;
   onSeek: (timestamp: number) => void;
   onEnded?: () => void;
+  showStats?: boolean;
+  videoTitle?: string;
+  idleGameUrl?: string;
 }
 
 const SYNC_TOLERANCE_SECONDS = 2;
@@ -62,7 +71,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded }: Props) {
+export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded, showStats = false, videoTitle, idleGameUrl }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRef = useRef(false);
@@ -79,6 +88,9 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+
+  const [mediaInfo, setMediaInfo] = useState<JellyfinMediaInfo | null>(null);
+  const [liveStats, setLiveStats] = useState({ bufferAhead: 0, bandwidth: 0, droppedFrames: 0 });
 
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
@@ -123,6 +135,78 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       .catch(() => {});
   }, [selectedTrackIndex, jellyfinId]);
 
+  // Fetch Jellyfin codec/format metadata for the stats overlay and startup log.
+  useEffect(() => {
+    setMediaInfo(null);
+    if (!jellyfinId) return;
+    fetch(`/api/jellyfin/media-info/${jellyfinId}`)
+      .then((r) => r.json())
+      .then((data: JellyfinMediaInfo) => {
+        setMediaInfo(data);
+        const v = data.video;
+        const a = data.audio;
+        const vCodec = v?.codec
+          ? (data.isVideoTranscoded ? `${v.codec.toUpperCase()} → H.264` : v.codec.toUpperCase())
+          : '?';
+        const vLine = [
+          vCodec,
+          v?.width && v?.height ? `${v.width}×${v.height}` : null,
+          v?.fps != null ? `${v.fps}fps` : null,
+          v?.bitrate != null ? fmtBitrate(v.bitrate) : null,
+          v?.profile ?? null,
+          v?.bitDepth != null ? `${v.bitDepth}-bit` : null,
+          v?.pixelFormat ?? null,
+        ].filter(Boolean).join(' | ');
+        const aCodec = a?.codec
+          ? (data.isAudioTranscoded
+            ? `${a.codec.toUpperCase()} → AAC`
+            : [a.codec.toUpperCase(), a.profile].filter(Boolean).join(' '))
+          : '?';
+        const aLine = [
+          aCodec,
+          a?.channelLayout ?? null,
+          a?.channels != null ? `${a.channels}ch` : null,
+          a?.sampleRate != null ? `${(a.sampleRate / 1000).toFixed(1)}kHz` : null,
+          a?.bitrate != null ? fmtBitrate(a.bitrate) : null,
+        ].filter(Boolean).join(' | ');
+        const flags = [
+          data.isVideoTranscoded ? 'video transcoded' : null,
+          data.isAudioTranscoded ? 'audio transcoded' : null,
+        ].filter(Boolean).join(', ');
+        const modeLine = `${(data.container ?? '?').toUpperCase()} | ${data.isDirectStream ? 'Direct Stream' : `HLS${flags ? ` (${flags})` : ''}`}`;
+        console.log(
+          `▶ Now playing${videoTitle ? `: "${videoTitle}"` : ''}\n` +
+          `  Video:  ${vLine}\n` +
+          `  Audio:  ${aLine}\n` +
+          `  Stream: ${modeLine}`,
+        );
+      })
+      .catch(() => {});
+  }, [jellyfinId, videoTitle]);
+
+  // Poll live stats (buffer, bandwidth, dropped frames) at 1-second intervals.
+  useEffect(() => {
+    if (!showStats) return;
+    const id = setInterval(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      let bufferAhead = 0;
+      const buf = video.buffered;
+      for (let i = 0; i < buf.length; i++) {
+        if (buf.start(i) <= video.currentTime + 0.5 && buf.end(i) > video.currentTime) {
+          bufferAhead = buf.end(i) - video.currentTime;
+          break;
+        }
+      }
+
+      const bandwidth = hlsRef.current?.bandwidthEstimate ?? 0;
+      const droppedFrames = (video as any).getVideoPlaybackQuality?.()?.droppedVideoFrames ?? 0;
+      setLiveStats({ bufferAhead, bandwidth, droppedFrames });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [showStats]);
+
   // Seed duration from Jellyfin metadata whenever the video changes.
   // This fires immediately so the seek bar is usable before loadedmetadata resolves.
   useEffect(() => {
@@ -137,6 +221,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     setStreamError('');
     setNeedsGesture(false);
     setIsBuffering(true);
+    setLiveStats({ bufferAhead: 0, bandwidth: 0, droppedFrames: 0 });
     hlsRef.current?.destroy();
     hlsRef.current = null;
     video.src = '';
@@ -378,10 +463,21 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         width: '100%',
         height: nativeHeight ? 'auto' : '100%',
         aspectRatio: nativeHeight ? '16/9' : undefined,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#000', color: 'var(--text-faint)', fontSize: 15, fontWeight: 600,
+        background: '#000',
+        display: idleGameUrl ? undefined : 'flex',
+        alignItems: idleGameUrl ? undefined : 'center',
+        justifyContent: idleGameUrl ? undefined : 'center',
+        color: 'var(--text-faint)',
+        fontSize: 15,
+        fontWeight: 600,
       }}>
-        No video selected
+        {idleGameUrl
+          ? <iframe
+              src={idleGameUrl}
+              style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+              allow="autoplay"
+            />
+          : 'No video selected'}
       </div>
     );
   }
@@ -503,6 +599,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
                   borderRadius: 10, padding: '5px 0', minWidth: 160,
                   backdropFilter: 'blur(12px)',
                   boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+                  maxHeight: 226, overflowY: 'auto',
                 }}>
                   {[{ index: null as number | null, displayTitle: 'Off' }, ...subtitleTracks].map((t) => (
                     <button
@@ -623,6 +720,63 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         }} />
         {isPlaying ? 'In sync' : 'Paused'}
       </div>
+
+      {showStats && (
+        <div style={{
+          position: 'absolute', top: 12, right: 12,
+          background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(8px)',
+          borderRadius: 8, padding: '10px 14px', minWidth: 210, maxWidth: 280,
+          pointerEvents: 'none', zIndex: 5,
+          fontFamily: 'monospace', fontSize: 11.5,
+          lineHeight: 1.8,
+        }}>
+          {/* helpers */}
+          {(() => {
+            const hd = (label: string, value: string | null | undefined) => value ? (
+              <div key={label} style={{ display: 'flex', gap: 10 }}>
+                <span style={{ minWidth: 68, color: 'rgba(255,255,255,0.45)', fontWeight: 700, letterSpacing: '.04em', flexShrink: 0 }}>{label}</span>
+                <span style={{ color: '#fff' }}>{value}</span>
+              </div>
+            ) : null;
+            const sec = (title: string) => (
+              <div style={{ color: 'var(--accent)', fontWeight: 800, fontSize: 10, letterSpacing: '.06em', textTransform: 'uppercase', marginTop: 8, marginBottom: 1 }}>{title}</div>
+            );
+            const v = mediaInfo?.video;
+            const a = mediaInfo?.audio;
+            return (
+              <>
+                {v && (<>
+                  {sec('Video')}
+                  {hd('CODEC', mediaInfo?.isVideoTranscoded
+                    ? `${(v.codec ?? '').toUpperCase()} → H.264`
+                    : (v.codec ?? '').toUpperCase())}
+                  {hd('RES', v.width && v.height ? `${v.width} × ${v.height}` : null)}
+                  {hd('FPS', v.fps !== null ? String(v.fps) : null)}
+                  {hd('BITRATE', v.bitrate !== null ? fmtBitrate(v.bitrate) : null)}
+                  {hd('PROFILE', v.profile)}
+                  {hd('DEPTH', v.bitDepth !== null ? `${v.bitDepth}-bit` : null)}
+                  {hd('FORMAT', [v.pixelFormat, v.colorSpace].filter(Boolean).join(' · ') || null)}
+                </>)}
+                {a && (<>
+                  {sec('Audio')}
+                  {hd('CODEC', mediaInfo?.isAudioTranscoded
+                    ? `${(a.codec ?? '').toUpperCase()} → AAC`
+                    : [a.codec?.toUpperCase(), a.profile].filter(Boolean).join(' '))}
+                  {hd('LAYOUT', [a.channelLayout, a.channels !== null ? `${a.channels} ch` : null].filter(Boolean).join(' · ') || null)}
+                  {hd('RATE', a.sampleRate !== null ? `${(a.sampleRate / 1000).toFixed(1)} kHz` : null)}
+                  {hd('BITRATE', a.bitrate !== null ? fmtBitrate(a.bitrate) : null)}
+                </>)}
+                {sec('Stream')}
+                {hd('CONTAINER', mediaInfo?.container?.toUpperCase() ?? null)}
+                {hd('MODE', mediaInfo ? (mediaInfo.isDirectStream ? 'Direct' : 'HLS') : (isHls ? 'HLS' : 'Direct'))}
+                {hd('BUFFER', `${liveStats.bufferAhead.toFixed(1)} s`)}
+                {liveStats.bandwidth > 0 && hd('BANDWIDTH', fmtBitrate(liveStats.bandwidth))}
+                {hd('DROPPED', `${liveStats.droppedFrames} frames`)}
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {needsGesture && (
         <div

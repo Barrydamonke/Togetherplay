@@ -127,7 +127,14 @@ export function setupSocket(io: Server): void {
       });
       io.to(currentPin).emit('playback:update', { playback: room.playback });
       const video = room.queue[index];
-      if (video) emitSystemMessage(io, currentPin, `${video.title} has started playing`);
+      if (video) {
+        emitSystemMessage(io, currentPin, `${video.title} has started playing`);
+        const dur = video.duration
+          ? ` · ${Math.floor(video.duration / 60)}m ${Math.floor(video.duration % 60)}s`
+          : '';
+        const mode = video.isHls ? 'HLS' : 'Direct Stream';
+        console.log(`▶ "${video.title}" started playing in room ${currentPin} [${video.source} · ${mode}${dur}]`);
+      }
     });
 
     socket.on('queue:reorder', ({ from, to }: { from: number; to: number }) => {
@@ -152,12 +159,12 @@ export function setupSocket(io: Server): void {
 
     socket.on(
       'room:update_settings',
-      ({ hidden, viewerCanManageQueue, viewerCanControl }: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean }>) => {
+      ({ hidden, viewerCanManageQueue, viewerCanControl, idleGameUrl }: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean; idleGameUrl: string }>) => {
         if (!currentPin) return;
         const room = getRoom(currentPin);
         if (!room || room.hostId !== socket.id) return;
-        updateRoomSettings(currentPin, { hidden, viewerCanManageQueue, viewerCanControl });
-        io.to(currentPin).emit('room:settings_updated', { hidden: room.hidden, viewerCanManageQueue: room.viewerCanManageQueue, viewerCanControl: room.viewerCanControl });
+        updateRoomSettings(currentPin, { hidden, viewerCanManageQueue, viewerCanControl, idleGameUrl });
+        io.to(currentPin).emit('room:settings_updated', { hidden: room.hidden, viewerCanManageQueue: room.viewerCanManageQueue, viewerCanControl: room.viewerCanControl, idleGameUrl: room.idleGameUrl });
       },
     );
 

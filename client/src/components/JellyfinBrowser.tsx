@@ -67,11 +67,11 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentParentId]);
 
-  async function load(searchTerm?: string) {
+  async function load() {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchItems({ parentId: currentParentId, search: searchTerm, limit: 50 });
+      const data = await fetchItems({ parentId: currentParentId, limit: 50 });
       setItems(data.Items);
     } catch {
       setError('Failed to load library. Check your Jellyfin config.');
@@ -79,6 +79,10 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
       setLoading(false);
     }
   }
+
+  const filteredItems = search.trim()
+    ? items.filter((item) => item.Name.toLowerCase().includes(search.trim().toLowerCase()))
+    : items;
 
   function navigate(item: JellyfinItem) {
     setBreadcrumbs((prev) => [...prev, { id: item.Id, name: item.Name }]);
@@ -109,11 +113,6 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
     } finally {
       setAdding(null);
     }
-  }
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    load(search || undefined);
   }
 
   return (
@@ -182,7 +181,7 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
 
         {/* Search */}
         <div style={{ padding: '0 20px 14px' }}>
-          <form onSubmit={handleSearch} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)', background: 'var(--surface-2)' }}>
+          <form onSubmit={(e) => e.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)', background: 'var(--surface-2)' }}>
             <Icon name="search" size={17} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
             <input
               value={search}
@@ -219,10 +218,10 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
           {error && (
             <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13.5, padding: '8px 0' }}>{error}</p>
           )}
-          {!loading && items.length === 0 && !error && (
+          {!loading && filteredItems.length === 0 && !error && (
             <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontWeight: 600, padding: '30px 0' }}>No items found.</p>
           )}
-          {items.map((item) => {
+          {filteredItems.map((item) => {
             const browseable = BROWSEABLE_TYPES.has(item.Type);
             const playable = PLAYABLE_TYPES.has(item.Type);
             return (

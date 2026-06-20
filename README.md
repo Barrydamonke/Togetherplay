@@ -7,10 +7,11 @@ Watch videos together in real time. One person hosts a room, shares a PIN, and e
 ## How it works
 
 - The **host** creates a room and gets a 4-digit PIN
-- **Guests** join with that PIN
+- **Guests** join with that PIN, or pick a room from the public browser on the landing page
 - The host controls playback (play, pause, seek); everyone follows automatically
 - Each person controls their own volume and subtitles independently
 - A built-in chat runs alongside the video
+- When no video is queued, the idle screen can display a custom embed — or just a plain "No video selected" message
 
 ---
 
@@ -42,7 +43,6 @@ cp .env.example server/.env
 | `JELLYFIN_URL` | Full URL to your Jellyfin server, e.g. `https://media.example.com` |
 | `JELLYFIN_API_KEY` | API key from Jellyfin → Dashboard → API Keys |
 | `JELLYFIN_USER_ID` | Your Jellyfin user ID (found in Dashboard → Users → click your user) |
-| `UPLOAD_SERVICE_URL` | URL of the optional upload service (leave blank if not using) |
 | `ADMIN_PASSWORD` | Password for the in-app admin panel |
 
 **3. Start the servers**
@@ -101,7 +101,6 @@ Set these in `docker-compose.yml` under `environment:`, or configure Jellyfin se
 | `JELLYFIN_URL` | No* | Full URL to your Jellyfin server |
 | `JELLYFIN_API_KEY` | No* | Jellyfin API key |
 | `JELLYFIN_USER_ID` | No* | Jellyfin user ID |
-| `UPLOAD_SERVICE_URL` | No | Optional upload service URL |
 
 *Can be configured at any time through the admin panel instead.
 
@@ -130,9 +129,10 @@ docker compose up -d --build
 
 ### Joining a room (guest)
 
-1. Enter your name and click **Join with a PIN**
-2. Type the 4-digit PIN the host gave you
-3. Playback is controlled by the host — your volume and subtitles are your own
+1. Enter your name and either:
+   - Click a room in the **public room browser** on the landing page, or
+   - Click **Join with a PIN** and type the 4-digit PIN the host gave you
+2. Playback is controlled by the host — your volume and subtitles are your own
 
 ### Subtitles
 
@@ -140,11 +140,29 @@ Click the **CC** button in the video player controls to open the subtitle track 
 
 ### Queue management
 
-The host can reorder, remove, and skip videos using the queue panel in the sidebar. When the current video ends the next one in the queue starts automatically.
+The host (and any viewers granted permission) can add, reorder, and remove videos using the queue panel in the sidebar. When the current video ends, the next one in the queue starts automatically.
+
+### Room settings (host only)
+
+Click the **settings** icon in the top-right of the sidebar to open the room settings panel.
+
+- **Hidden room** — removes the room from the public browser; guests must use the PIN
+- **Viewers can manage queue** — lets guests add videos and reorder the queue
+- **Viewers can control playback** — lets guests play, pause, and seek
+- **Idle screen embed URL** — paste any URL to display it as an iframe when no video is queued (leave blank for the default "No video selected" message)
+
+### Video stats overlay
+
+Toggle **Video stats overlay** in the settings panel to show codec, resolution, buffer level, and stream info directly on the player.
+
+### Aspect ratio
+
+The **Display** section of the settings panel lets you lock the player to a specific aspect ratio (16:9, 4:3, 2.39:1) or leave it on **Auto** to resize to each video's native dimensions.
 
 ---
 
 ## Coming soon
 
-- **Upload service** — drop a video file directly into the room without needing a Jellyfin library. Files are stored temporarily and served via a self-hosted upload service.
-- **YouTube support** — paste a YouTube URL into the queue and watch it together in sync.
+- **Upload service** — drop a video file directly into the room without needing a Jellyfin library
+- **Persistent rooms** — room state currently lives in memory; a server restart clears active sessions
+- **Rate limiting** — no throttling on socket events or API endpoints yet

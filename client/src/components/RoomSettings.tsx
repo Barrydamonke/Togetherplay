@@ -15,8 +15,10 @@ interface Props {
   currentUsername: string;
   aspectRatio: AspectRatio;
   onSetAspectRatio: (ratio: AspectRatio) => void;
+  showStats: boolean;
+  onSetShowStats: (v: boolean) => void;
   onRename: (name: string) => void;
-  onUpdateSettings: (settings: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean }>) => void;
+  onUpdateSettings: (settings: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean; idleGameUrl: string }>) => void;
   onClose: () => void;
 }
 
@@ -72,9 +74,11 @@ function SettingRow({ label, description, on, onToggle }: { label: string; descr
   );
 }
 
-export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSetAspectRatio, onRename, onUpdateSettings, onClose }: Props) {
+export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSetAspectRatio, showStats, onSetShowStats, onRename, onUpdateSettings, onClose }: Props) {
   const [name, setName] = useState(currentUsername);
   const [nameSaved, setNameSaved] = useState(false);
+  const [idleGameUrl, setIdleGameUrl] = useState(room.idleGameUrl ?? '');
+  const [idleGameSaved, setIdleGameSaved] = useState(false);
 
   function saveName() {
     const trimmed = name.trim();
@@ -82,6 +86,12 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
     onRename(trimmed);
     setNameSaved(true);
     setTimeout(() => setNameSaved(false), 1400);
+  }
+
+  function saveIdleGameUrl() {
+    onUpdateSettings({ idleGameUrl: idleGameUrl.trim() });
+    setIdleGameSaved(true);
+    setTimeout(() => setIdleGameSaved(false), 1400);
   }
 
   return (
@@ -200,6 +210,16 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
                 ? 'The player resizes to match each video\'s native aspect ratio.'
                 : `Forces a ${aspectRatio} frame. Other ratios will letterbox or pillarbox.`}
             </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, paddingTop: 14, borderTop: '1px solid var(--border-soft)', marginTop: 14 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Video stats overlay</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-dim)', fontWeight: 600, marginTop: 2 }}>
+                  Show codec, resolution, buffer, and stream info on the player.
+                </div>
+              </div>
+              <Toggle on={showStats} onToggle={() => onSetShowStats(!showStats)} />
+            </div>
           </section>
 
           {/* Host-only room settings */}
@@ -224,6 +244,32 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
                 on={room.viewerCanControl}
                 onToggle={() => onUpdateSettings({ viewerCanControl: !room.viewerCanControl })}
               />
+              <div style={{ paddingTop: 16 }}>
+                <label style={labelCap}>Idle screen embed URL</label>
+                <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-faint)', fontWeight: 600 }}>
+                  Shown when no video is queued. Leave blank to show "No video selected".
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    style={inputStyle}
+                    value={idleGameUrl}
+                    placeholder="https://…"
+                    onChange={(e) => { setIdleGameUrl(e.target.value); setIdleGameSaved(false); }}
+                    onKeyDown={(e) => e.key === 'Enter' && saveIdleGameUrl()}
+                  />
+                  <button
+                    onClick={saveIdleGameUrl}
+                    style={{
+                      padding: '10px 16px', borderRadius: 10, border: 'none',
+                      background: idleGameSaved ? 'var(--online)' : 'var(--accent)',
+                      color: 'var(--accent-ink)', fontWeight: 800, fontSize: 13,
+                      transition: 'background .2s', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {idleGameSaved ? 'Saved!' : 'Save'}
+                  </button>
+                </div>
+              </div>
             </section>
           )}
         </div>

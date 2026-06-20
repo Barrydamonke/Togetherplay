@@ -37,6 +37,7 @@ export interface Room {
   hidden: boolean;
   viewerCanManageQueue: boolean;
   viewerCanControl: boolean;
+  idleGameUrl?: string;
   members: Member[];
   queue: Video[];
   currentVideoIndex: number;

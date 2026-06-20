@@ -35,6 +35,15 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
     localStorage.setItem('tg-aspect-ratio', ratio);
   }
 
+  const [showStats, setShowStats] = useState(
+    () => localStorage.getItem('tg-show-stats') === 'true',
+  );
+
+  function handleSetShowStats(v: boolean) {
+    setShowStats(v);
+    localStorage.setItem('tg-show-stats', String(v));
+  }
+
   const RATIO_NUMS: Record<Exclude<AspectRatio, 'auto'>, [number, number]> = {
     '16/9':   [16, 9],
     '4/3':    [4, 3],
@@ -76,7 +85,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
 
     socket.on(
       'room:settings_updated',
-      (settings: { hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean }) => {
+      (settings: { hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean; idleGameUrl?: string }) => {
         setRoom((prev) => ({ ...prev, ...settings }));
       },
     );
@@ -119,9 +128,12 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
                 isHls={currentVideo?.isHls ?? true}
                 knownDuration={currentVideo?.duration}
                 jellyfinId={currentVideo?.jellyfinId}
+                videoTitle={currentVideo?.title}
                 playback={room.playback}
                 isHost={isHost}
                 canControl={isHost || room.viewerCanControl}
+                showStats={showStats}
+                idleGameUrl={room.idleGameUrl}
                 onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
                 onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
                 onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
@@ -139,9 +151,12 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
               isHls={currentVideo?.isHls ?? true}
               knownDuration={currentVideo?.duration}
               jellyfinId={currentVideo?.jellyfinId}
+              videoTitle={currentVideo?.title}
               playback={room.playback}
               isHost={isHost}
               canControl={isHost || room.viewerCanControl}
+              showStats={showStats}
+              idleGameUrl={room.idleGameUrl}
               onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
               onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
               onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
@@ -264,6 +279,8 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           currentUsername={room.members.find((m) => m.id === memberId)?.username ?? ''}
           aspectRatio={aspectRatio}
           onSetAspectRatio={handleSetAspectRatio}
+          showStats={showStats}
+          onSetShowStats={handleSetShowStats}
           onRename={(name) => {
             socket.emit('room:rename_self', { username: name });
           }}
