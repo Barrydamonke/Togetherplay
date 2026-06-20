@@ -39,8 +39,9 @@ export async function getStreamUrl(jellyfinId: string): Promise<{ streamUrl: str
   // Discord's Activity iframe CSP blocks cross-origin media URLs.
   // Rewrite the Jellyfin origin to /.proxy/jellyfin so the browser treats it as
   // same-origin — Discord then proxies it through to Jellyfin transparently.
-  const { isDiscordActivity } = await import('./discord');
-  if (isDiscordActivity) {
+  // Use frame_id (injected by Discord into the URL) rather than the SDK init flag,
+  // so the rewrite works even if the OAuth flow failed and isDiscordActivity is false.
+  if (new URLSearchParams(window.location.search).has('frame_id')) {
     data.streamUrl = data.streamUrl.replace(/^https?:\/\/[^/?#]+/, '/.proxy/jellyfin');
   }
 
