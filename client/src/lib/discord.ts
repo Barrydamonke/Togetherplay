@@ -46,7 +46,10 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
     // the Discord iframe sandbox blocks those cross-origin requests.
     // hls.js uses XHR for segment fetches, which also gets patched transparently.
     if (jellyfinHost) {
-      patchUrlMappings([{ prefix: '/proxy/jellyfin', target: jellyfinHost }]);
+      patchUrlMappings(
+        [{ prefix: '/proxy/jellyfin', target: jellyfinHost }],
+        { patchSrcAttributes: true },
+      );
     }
 
     await sdk.commands.authenticate({ access_token });
