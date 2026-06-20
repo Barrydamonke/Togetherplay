@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 import { Logo } from './Logo';
 import { useToasts, ToastContainer } from './Toast';
 import { useIsMobile } from '../lib/useIsMobile';
+import { useRateLimit } from '../lib/useRateLimit';
 
 interface Props {
   initialRoom: RoomType;
@@ -23,6 +24,9 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
   const [room, setRoom] = useState<RoomType>(initialRoom);
   const [showSettings, setShowSettings] = useState(false);
   const { toasts, addToast } = useToasts();
+  const { rateLimited, check: checkRateLimit } = useRateLimit(() =>
+    addToast('chill out bro, go touch some grass before doing that again'),
+  );
   const socket = getSocket();
   const isMobile = useIsMobile();
 
@@ -256,9 +260,12 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           room={room}
           isHost={isHost}
           isMobile={isMobile}
+          rateLimited={rateLimited}
           onSetCurrentVideo={(index) => socket.emit('queue:set_current', { index })}
           onRemoveFromQueue={(index) => socket.emit('queue:remove', { index })}
-          onAddVideo={(video) => socket.emit('queue:add', { video })}
+          onAddVideo={(video) => {
+            if (checkRateLimit('queueAdd')) socket.emit('queue:add', { video });
+          }}
           onReorderQueue={(from, to) => socket.emit('queue:reorder', { from, to })}
         />
 
@@ -266,7 +273,10 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           messages={room.chat}
           currentMemberId={memberId}
           isMobile={isMobile}
-          onSend={(text) => socket.emit('chat:message', { text })}
+          rateLimited={rateLimited}
+          onSend={(text) => {
+            if (checkRateLimit('chat')) socket.emit('chat:message', { text });
+          }}
         />
       </aside>
 

@@ -6,6 +6,7 @@ interface Props {
   messages: ChatMessage[];
   currentMemberId: string;
   isMobile?: boolean;
+  rateLimited?: boolean;
   onSend: (text: string) => void;
 }
 
@@ -21,7 +22,7 @@ function formatVideoTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function Chat({ messages, currentMemberId, isMobile, onSend }: Props) {
+export function Chat({ messages, currentMemberId, isMobile, rateLimited, onSend }: Props) {
   const [text, setText] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -125,20 +126,24 @@ export function Chat({ messages, currentMemberId, isMobile, onSend }: Props) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder="Say something…"
+          placeholder={rateLimited ? '🌿 touch some grass first…' : 'Say something…'}
           maxLength={500}
+          disabled={rateLimited}
           style={{
             flex: 1, padding: '10px 14px', borderRadius: 99,
             border: '1.5px solid var(--border)', background: 'var(--surface-2)',
             color: 'var(--text)', fontSize: 13.5, fontWeight: 600, outline: 'none',
+            opacity: rateLimited ? 0.45 : 1,
           }}
         />
         <button
           onClick={send}
+          disabled={rateLimited}
           style={{
             width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
             background: 'var(--accent)', color: 'var(--accent-ink)',
             display: 'grid', placeItems: 'center',
+            opacity: rateLimited ? 0.45 : 1,
           }}
         >
           <Icon name="send" size={17} />

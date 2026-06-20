@@ -7,6 +7,7 @@ interface Props {
   room: Room;
   isHost: boolean;
   isMobile?: boolean;
+  rateLimited?: boolean;
   onSetCurrentVideo: (index: number) => void;
   onRemoveFromQueue: (index: number) => void;
   onAddVideo: (video: Video) => void;
@@ -50,7 +51,7 @@ function CopyPin({ pin }: { pin: string }) {
   );
 }
 
-export function Sidebar({ room, isHost, isMobile, onSetCurrentVideo, onRemoveFromQueue, onAddVideo, onReorderQueue }: Props) {
+export function Sidebar({ room, isHost, isMobile, rateLimited, onSetCurrentVideo, onRemoveFromQueue, onAddVideo, onReorderQueue }: Props) {
   const [showBrowser, setShowBrowser] = useState(false);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const dragIndexRef = useRef<number | null>(null);
@@ -120,11 +121,13 @@ export function Sidebar({ room, isHost, isMobile, onSetCurrentVideo, onRemoveFro
           {canManageQueue && (
             <button
               onClick={() => setShowBrowser(true)}
+              disabled={rateLimited}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 fontSize: 12.5, fontWeight: 800, color: 'var(--accent)',
                 background: 'var(--accent-soft)', border: 'none',
                 padding: '5px 11px', borderRadius: 99,
+                opacity: rateLimited ? 0.45 : 1,
               }}
             >
               <Icon name="plus" size={14} /> Add

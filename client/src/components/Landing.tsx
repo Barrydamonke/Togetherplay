@@ -6,8 +6,10 @@ import { Logo } from './Logo';
 import { AdminPanel } from './AdminPanel';
 import { ReleaseNotes } from './ReleaseNotes';
 import { useIsMobile } from '../lib/useIsMobile';
+import { useToasts, ToastContainer } from './Toast';
+import { useRateLimit } from '../lib/useRateLimit';
 
-const APP_VERSION = '1.3.3';
+const APP_VERSION = '1.3.4';
 
 interface Props {
   theme: 'dark' | 'light';
@@ -400,6 +402,10 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   const [availableRooms, setAvailableRooms] = useState<Array<{ pin: string; memberCount: number; memberNames: string[] }>>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
   const isMobile = useIsMobile();
+  const { toasts, addToast } = useToasts();
+  const { rateLimited, check: checkRateLimit } = useRateLimit(() =>
+    addToast('chill out bro, go touch some grass before doing that again'),
+  );
 
   useEffect(() => {
     console.log(`Togetherplay v${APP_VERSION}`);
@@ -449,6 +455,7 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
   }
 
   function submitCreate(hidden: boolean) {
+    if (!checkRateLimit('roomCreate')) return;
     const trimmed = username.trim();
     if (!trimmed) return;
     localStorage.setItem('tg-username', trimmed);
@@ -719,12 +726,12 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
               <button
                 onClick={() => submitCreate(false)}
-                disabled={loading}
+                disabled={loading || rateLimited}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px',
                   borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)',
                   background: 'var(--surface-2)', textAlign: 'left', cursor: 'pointer', width: '100%',
-                  opacity: loading ? 0.6 : 1,
+                  opacity: loading || rateLimited ? 0.6 : 1,
                 }}
               >
                 <span style={{
@@ -746,12 +753,12 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
 
               <button
                 onClick={() => submitCreate(true)}
-                disabled={loading}
+                disabled={loading || rateLimited}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px',
                   borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)',
                   background: 'var(--surface-2)', textAlign: 'left', cursor: 'pointer', width: '100%',
-                  opacity: loading ? 0.6 : 1,
+                  opacity: loading || rateLimited ? 0.6 : 1,
                 }}
               >
                 <span style={{
@@ -909,6 +916,8 @@ export function Landing({ theme, onToggleTheme, onJoined }: Props) {
           }} />
         </span>
       </button>
+
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }
