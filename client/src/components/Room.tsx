@@ -17,7 +17,7 @@ interface Props {
   memberId: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
-  onLeave: () => void;
+  onLeave?: () => void;
 }
 
 export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: Props) {
@@ -241,18 +241,20 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={15} />
             </button>
 
-            <button
-              onClick={onLeave}
-              title="Leave room"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontSize: 13, fontWeight: 700, color: 'var(--text-dim)',
-                background: 'var(--surface-2)', border: '1px solid var(--border)',
-                padding: '7px 12px', borderRadius: 99,
-              }}
-            >
-              <Icon name="door" size={15} /> Leave
-            </button>
+            {onLeave && (
+              <button
+                onClick={onLeave}
+                title="Leave room"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  fontSize: 13, fontWeight: 700, color: 'var(--text-dim)',
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  padding: '7px 12px', borderRadius: 99,
+                }}
+              >
+                <Icon name="door" size={15} /> Leave
+              </button>
+            )}
           </div>
         </div>
 

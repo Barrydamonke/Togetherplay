@@ -4,6 +4,9 @@ WORKDIR /build
 COPY client/package*.json ./
 RUN npm ci
 COPY client/ ./
+# VITE_ vars are baked into the bundle at build time, so they must come in as build args.
+ARG VITE_DISCORD_CLIENT_ID
+ENV VITE_DISCORD_CLIENT_ID=$VITE_DISCORD_CLIENT_ID
 RUN npm run build
 
 # Stage 2: Compile the server TypeScript

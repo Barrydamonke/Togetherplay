@@ -6,9 +6,15 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { tryInitDiscord } from './lib/discord';
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+async function mount() {
+  const discordContext = await tryInitDiscord();
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App discordContext={discordContext} />
+    </StrictMode>
+  );
+}
+
+mount();

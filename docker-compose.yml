@@ -1,12 +1,20 @@
 services:
   togetherplay:
-    build: /mnt/user/appdata/togetherplay
+    build:
+      context: /mnt/user/appdata/togetherplay
+      args:
+        # Baked into the client bundle at build time — rebuild the image after changing this.
+        VITE_DISCORD_CLIENT_ID: ${VITE_DISCORD_CLIENT_ID:-}
     container_name: togetherplay
     ports:
       - "3000:3000"
     environment:
       - DATA_DIR=/data
       - ADMIN_PASSWORD=changme
+      # Discord Activity credentials — get these from the Discord Developer Portal.
+      # Leave blank to disable Discord Activity support.
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID:-}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET:-}
     volumes:
       - /mnt/user/appdata/togetherplay/data:/data
     restart: unless-stopped

@@ -122,6 +122,30 @@ export function getAllRooms(): RoomSummary[] {
     }));
 }
 
+// Used by Discord Activity: joins existing room or creates one with the given PIN.
+// instanceId is shared across all users in the same Activity session, so whoever
+// arrives first creates the room and everyone else joins it.
+export function joinOrCreateRoom(pin: string, memberId: string, username: string): Room {
+  const existing = rooms.get(pin);
+  if (existing) {
+    return joinRoom(pin, memberId, username) ?? existing;
+  }
+  const room: Room = {
+    pin,
+    hostId: memberId,
+    hidden: true,
+    viewerCanManageQueue: false,
+    viewerCanControl: false,
+    members: [{ id: memberId, username, isHost: true }],
+    queue: [],
+    currentVideoIndex: -1,
+    playback: { playing: false, timestamp: 0, lastSyncedAt: Date.now() },
+    chat: [],
+  };
+  rooms.set(pin, room);
+  return room;
+}
+
 export function getOnlineStats(): { membersOnline: number; memberNames: string[] } {
   const names: string[] = [];
   for (const room of rooms.values()) {

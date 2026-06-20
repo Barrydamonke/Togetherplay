@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
-import { createRoom, getRoom, joinRoom, leaveRoom, getCurrentTimestamp, getOnlineStats, updateRoomSettings, renameMember } from './rooms';
+import { createRoom, getRoom, joinRoom, joinOrCreateRoom, leaveRoom, getCurrentTimestamp, getOnlineStats, updateRoomSettings, renameMember } from './rooms';
 import { Video, ChatMessage } from './types';
 
 function emitSystemMessage(io: Server, pin: string, text: string): void {
@@ -50,6 +50,23 @@ export function setupSocket(io: Server): void {
 
       const isHost = room.hostId === socket.id;
       socket.emit('room:joined', { room: syncedRoom, isHost });
+      socket.to(pin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
+      io.emit('server:stats', getOnlineStats());
+    });
+
+    socket.on('room:join_or_create', ({ pin, username }: { pin: string; username: string }) => {
+      const room = joinOrCreateRoom(pin, socket.id, username);
+      currentPin = pin;
+      socket.join(pin);
+      const syncedRoom = {
+        ...room,
+        playback: {
+          ...room.playback,
+          timestamp: getCurrentTimestamp(room),
+          lastSyncedAt: Date.now(),
+        },
+      };
+      socket.emit('room:joined', { room: syncedRoom, isHost: room.hostId === socket.id });
       socket.to(pin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
       io.emit('server:stats', getOnlineStats());
     });

@@ -7,6 +7,7 @@ import { setupSocket } from './socket';
 import jellyfinRouter from './routes/jellyfin';
 import adminRouter from './routes/admin';
 import roomsRouter from './routes/rooms';
+import discordRouter from './routes/discord';
 import { getConfig } from './config';
 
 const app = express();
@@ -20,6 +21,7 @@ app.use(express.json());
 
 app.use('/api/jellyfin', jellyfinRouter);
 app.use('/api/rooms', roomsRouter);
+app.use('/api/discord', discordRouter);
 app.use('/admin', adminRouter);
 
 app.get('/api/landing-message', (_req, res) => {
