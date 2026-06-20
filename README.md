@@ -166,3 +166,4 @@ The **Display** section of the settings panel lets you lock the player to a spec
 - **Upload service** — drop a video file directly into the room without needing a Jellyfin library
 - **Persistent rooms** — room state currently lives in memory; a server restart clears active sessions
 - **Rate limiting** — no throttling on socket events or API endpoints yet
+- **Discord Activity Intergration** - This will work as a discord activity at some point in the future
