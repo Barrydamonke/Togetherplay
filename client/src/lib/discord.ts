@@ -6,6 +6,10 @@ export interface DiscordContext {
   instanceId: string;
 }
 
+// Set to true after a successful Discord Activity init.
+// Used by other modules (e.g. jellyfin.ts) to adjust behaviour without prop drilling.
+export let isDiscordActivity = false;
+
 export async function tryInitDiscord(): Promise<DiscordContext | null> {
   // Discord injects frame_id into the URL when loading as an Activity.
   if (!new URLSearchParams(window.location.search).has('frame_id')) return null;
@@ -45,14 +49,19 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
     // Video stream URLs contain the Jellyfin origin directly; without this patch,
     // the Discord iframe sandbox blocks those cross-origin requests.
     // hls.js uses XHR for segment fetches, which also gets patched transparently.
+    // patchUrlMappings handles absolute Jellyfin URLs that appear inside HLS manifests
+    // (Jellyfin can embed absolute segment URLs). The prefix must match what Discord
+    // actually serves: /.proxy/<portal-prefix> — not the portal prefix itself.
     if (jellyfinHost) {
       patchUrlMappings(
-        [{ prefix: '/proxy/jellyfin', target: jellyfinHost }],
+        [{ prefix: '/.proxy/jellyfin', target: jellyfinHost }],
         { patchSrcAttributes: true },
       );
     }
 
     await sdk.commands.authenticate({ access_token });
+
+    isDiscordActivity = true;
 
     return {
       username: user.username,

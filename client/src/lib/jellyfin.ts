@@ -29,16 +29,22 @@ export async function fetchItems(params: {
 }
 
 export async function getStreamUrl(jellyfinId: string): Promise<{ streamUrl: string; isHls: boolean }> {
-  // Inside Discord's Activity iframe, media-src CSP blocks direct Jellyfin URLs.
-  // Force HLS so hls.js fetches segments via XHR (which patchUrlMappings intercepts)
-  // rather than setting video.src directly to the cross-origin stream URL.
-  const forceHls = window.location.hostname.endsWith('.discordapp.com');
-  const res = await fetch(`/api/jellyfin/stream-url/${jellyfinId}${forceHls ? '?forceHls=1' : ''}`);
+  const res = await fetch(`/api/jellyfin/stream-url/${jellyfinId}`);
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(err.error ?? 'Failed to get stream URL');
   }
-  return res.json() as Promise<{ streamUrl: string; isHls: boolean }>;
+  const data = await res.json() as { streamUrl: string; isHls: boolean };
+
+  // Discord's Activity iframe CSP blocks cross-origin media URLs.
+  // Rewrite the Jellyfin origin to /.proxy/jellyfin so the browser treats it as
+  // same-origin — Discord then proxies it through to Jellyfin transparently.
+  const { isDiscordActivity } = await import('./discord');
+  if (isDiscordActivity) {
+    data.streamUrl = data.streamUrl.replace(/^https?:\/\/[^/?#]+/, '/.proxy/jellyfin');
+  }
+
+  return data;
 }
 
 export function thumbnailUrl(jellyfinId: string): string {
