@@ -244,7 +244,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
         </div>
 
         {/* Info bar below player */}
-        {currentVideo && (
+        {currentVideo && !(isDiscordMode && sidebarHidden) && (
           <div style={{
             padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14,
             borderTop: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0,
