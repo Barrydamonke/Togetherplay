@@ -26,7 +26,6 @@ router.post('/token', async (req: Request, res: Response) => {
         client_secret: clientSecret,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `https://${clientId}.discordsays.com`,
       }),
     });
     if (!tokenRes.ok) {
