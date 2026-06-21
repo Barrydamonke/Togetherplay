@@ -29,7 +29,9 @@ router.post('/token', async (req: Request, res: Response) => {
       }),
     });
     if (!tokenRes.ok) {
-      res.status(502).json({ error: 'Discord token exchange failed' });
+      const errorBody = await tokenRes.text().catch(() => '(unreadable)');
+      console.error('[Discord] Token exchange failed:', tokenRes.status, errorBody);
+      res.status(502).json({ error: 'Discord token exchange failed', detail: errorBody });
       return;
     }
     const { access_token } = await tokenRes.json() as { access_token: string };

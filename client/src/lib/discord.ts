@@ -37,7 +37,10 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
     });
-    if (!res.ok) throw new Error(`Token endpoint returned ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { detail?: string };
+      throw new Error(`Token endpoint returned ${res.status}: ${body.detail ?? '(no detail)'}`);
+    }
 
     const { access_token, user, jellyfinHost } = await res.json() as {
       access_token: string;
