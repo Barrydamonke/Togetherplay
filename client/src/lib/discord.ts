@@ -24,13 +24,17 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
     const sdk = new DiscordSDK(clientId);
     await sdk.ready();
 
+    // redirect_uri is missing from the SDK's AuthorizeInput types but is required
+    // by Discord's OAuth2 backend. Cast to any to pass it through.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { code } = await sdk.commands.authorize({
       client_id: clientId,
       response_type: 'code',
       state: '',
       prompt: 'none',
       scope: ['identify'],
-    });
+      redirect_uri: `https://${clientId}.discordsays.com`,
+    } as any);
 
     const res = await fetch('/api/discord/token', {
       method: 'POST',
