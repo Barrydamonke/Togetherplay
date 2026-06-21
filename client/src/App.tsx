@@ -15,7 +15,9 @@ export default function App({ discordContext }: Props) {
   const [room, setRoom] = useState<RoomType | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [memberId, setMemberId] = useState('');
-  const [discordJoining, setDiscordJoining] = useState(discordContext !== null);
+  const [discordUsername, setDiscordUsername] = useState(discordContext?.username ?? '');
+  const [discordJoining, setDiscordJoining] = useState(false);
+  const [discordError, setDiscordError] = useState('');
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (localStorage.getItem('tg-theme') as 'dark' | 'light') || 'dark',
   );
@@ -25,52 +27,22 @@ export default function App({ discordContext }: Props) {
     localStorage.setItem('tg-theme', theme);
   }, [theme]);
 
-  // Discord: skip Landing entirely, auto-join the room tied to this Activity instance.
-  // instanceId is shared across all users in the same voice channel Activity session,
-  // so the first person creates the room and everyone else joins it automatically.
-  useEffect(() => {
-    if (!discordContext) return;
-
-    const socket = getSocket();
-
-    const onJoined = ({ room: joinedRoom, isHost: joinedAsHost }: { room: RoomType; isHost: boolean }) => {
-      socket.off('room:error', onError);
-      setRoom(joinedRoom);
-      setIsHost(joinedAsHost);
-      setMemberId(socket.id ?? '');
-      setDiscordJoining(false);
-      const username = joinedRoom.members.find((m) => m.id === socket.id)?.username ?? '';
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ pin: joinedRoom.pin, username }));
-    };
-
-    const onError = ({ message }: { message: string }) => {
-      socket.off('room:joined', onJoined);
-      setDiscordJoining(false);
-      console.error('[Discord] Failed to join room:', message);
-    };
-
-    socket.once('room:joined', onJoined);
-    socket.once('room:error', onError);
-    socket.emit('room:join_or_create', { pin: discordContext.instanceId, username: discordContext.username });
-
-    return () => {
-      socket.off('room:joined', onJoined);
-      socket.off('room:error', onError);
-    };
-  }, [discordContext]);
-
   // Reconnect: re-join after a dropped connection.
   useEffect(() => {
     const socket = getSocket();
 
     const handleReconnect = () => {
       if (discordContext) {
+        const stored = sessionStorage.getItem(SESSION_KEY);
+        const username = stored
+          ? (JSON.parse(stored) as { pin: string; username: string }).username
+          : discordContext.username;
         socket.once('room:joined', ({ room: joinedRoom, isHost: joinedAsHost }) => {
           setRoom(joinedRoom);
           setIsHost(joinedAsHost);
           setMemberId(socket.id ?? '');
         });
-        socket.emit('room:join_or_create', { pin: discordContext.instanceId, username: discordContext.username });
+        socket.emit('room:join_or_create', { pin: discordContext.instanceId, username, avatar: discordContext.avatar });
         return;
       }
 
@@ -95,6 +67,27 @@ export default function App({ discordContext }: Props) {
     return () => { socket.off('reconnect', handleReconnect); };
   }, [discordContext]);
 
+  function handleDiscordJoin() {
+    if (!discordContext) return;
+    const trimmed = discordUsername.trim();
+    if (!trimmed) { setDiscordError('Enter a name to continue.'); return; }
+    setDiscordJoining(true);
+    setDiscordError('');
+    const socket = getSocket();
+    socket.once('room:joined', ({ room: joinedRoom, isHost: joinedAsHost }: { room: RoomType; isHost: boolean }) => {
+      setRoom(joinedRoom);
+      setIsHost(joinedAsHost);
+      setMemberId(socket.id ?? '');
+      setDiscordJoining(false);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ pin: joinedRoom.pin, username: trimmed }));
+    });
+    socket.once('room:error', ({ message }: { message: string }) => {
+      setDiscordJoining(false);
+      setDiscordError(message);
+    });
+    socket.emit('room:join_or_create', { pin: discordContext.instanceId, username: trimmed, avatar: discordContext.avatar });
+  }
+
   function handleJoined(joinedRoom: RoomType, joinedAsHost: boolean, id: string) {
     setRoom(joinedRoom);
     setIsHost(joinedAsHost);
@@ -115,13 +108,58 @@ export default function App({ discordContext }: Props) {
     setTheme((p) => (p === 'dark' ? 'light' : 'dark'));
   }
 
-  if (discordJoining) {
+  if (discordContext && !room) {
     return (
-      <div style={{
-        height: '100vh', display: 'grid', placeItems: 'center',
-        color: 'var(--text-dim)', fontWeight: 600, fontSize: 15,
-      }}>
-        Joining room…
+      <div style={{ height: '100vh', display: 'grid', placeItems: 'center', padding: 20 }}>
+        <div style={{
+          width: '100%', maxWidth: 380,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-xl)', padding: 30, boxShadow: 'var(--shadow)',
+        }}>
+          <h2 className="font-display" style={{ fontSize: 22, fontWeight: 600, margin: '0 0 6px', color: 'var(--text)' }}>
+            What should we call you?
+          </h2>
+          <p style={{ margin: '0 0 20px', fontSize: 13.5, color: 'var(--text-dim)', fontWeight: 600 }}>
+            You can change it from your Discord username if you like.
+          </p>
+          <input
+            style={{
+              width: '100%', padding: '13px 15px', borderRadius: 'var(--r-md)',
+              border: '1.5px solid var(--border)', background: 'var(--surface-2)',
+              color: 'var(--text)', fontSize: 15, fontWeight: 600, outline: 'none',
+              boxSizing: 'border-box',
+            }}
+            value={discordUsername}
+            maxLength={32}
+            autoFocus
+            onChange={(e) => setDiscordUsername(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleDiscordJoin()}
+          />
+          {discordError && (
+            <div style={{
+              fontSize: 13.5, color: 'var(--accent)', fontWeight: 700,
+              background: 'var(--accent-soft)', padding: '9px 13px',
+              borderRadius: 'var(--r-sm)', marginTop: 12,
+            }}>
+              {discordError}
+            </div>
+          )}
+          <button
+            onClick={handleDiscordJoin}
+            disabled={discordJoining}
+            style={{
+              marginTop: 16, width: '100%', padding: '13px 22px',
+              borderRadius: 'var(--r-md)', border: 'none',
+              background: 'var(--accent)', color: 'var(--accent-ink)',
+              fontWeight: 800, fontSize: 15,
+              boxShadow: '0 10px 24px -10px var(--accent)',
+              opacity: discordJoining ? 0.6 : 1,
+              cursor: discordJoining ? 'default' : 'pointer',
+            }}
+          >
+            {discordJoining ? 'Joining…' : 'Join session'}
+          </button>
+        </div>
       </div>
     );
   }

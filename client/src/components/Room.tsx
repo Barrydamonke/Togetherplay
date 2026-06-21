@@ -11,6 +11,7 @@ import { Logo } from './Logo';
 import { useToasts, ToastContainer } from './Toast';
 import { useIsMobile } from '../lib/useIsMobile';
 import { useRateLimit } from '../lib/useRateLimit';
+import { isFavourite, addFavourite, removeFavourite } from '../lib/favourites';
 
 interface Props {
   initialRoom: RoomType;
@@ -71,6 +72,18 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
   const [membersCollapsed, setMembersCollapsed] = useState(false);
   const [queueCollapsed, setQueueCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
+
+  // Favourites
+  const [isFaved, setIsFaved] = useState(false);
+  const [heartPopping, setHeartPopping] = useState(false);
+
+  const currentJellyfinId = room.currentVideoIndex >= 0
+    ? room.queue[room.currentVideoIndex]?.jellyfinId
+    : undefined;
+
+  useEffect(() => {
+    setIsFaved(currentJellyfinId ? isFavourite(currentJellyfinId) : false);
+  }, [currentJellyfinId]);
 
   // Queue drag state
   const [showBrowser, setShowBrowser] = useState(false);
@@ -171,6 +184,23 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
 
   const currentVideo = room.currentVideoIndex >= 0 ? room.queue[room.currentVideoIndex] : null;
 
+  function handleToggleFavourite() {
+    if (!currentVideo?.jellyfinId) return;
+    if (isFaved) {
+      removeFavourite(currentVideo.jellyfinId);
+      setIsFaved(false);
+    } else {
+      addFavourite({
+        jellyfinId: currentVideo.jellyfinId,
+        title: currentVideo.title,
+        thumbnailUrl: currentVideo.thumbnailUrl,
+        duration: currentVideo.duration,
+      });
+      setIsFaved(true);
+      setHeartPopping(true);
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100%', overflow: 'hidden' }}>
       {/* Video side */}
@@ -254,14 +284,30 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
                 {currentVideo.title}
               </div>
             </div>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              fontSize: 13, fontWeight: 700, color: 'var(--text-dim)',
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              padding: '8px 13px', borderRadius: 99, flexShrink: 0,
-            }}>
-              <Icon name="heart" size={15} style={{ color: 'var(--accent)' }} /> Loving this
-            </span>
+            <button
+              onClick={handleToggleFavourite}
+              disabled={!currentVideo?.jellyfinId}
+              title={isFaved ? 'Remove from favourites' : 'Add to favourites'}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                fontSize: 13, fontWeight: 700,
+                color: isFaved ? 'var(--accent)' : 'var(--text-dim)',
+                background: isFaved ? 'var(--accent-soft)' : 'var(--surface-2)',
+                border: `1px solid ${isFaved ? 'var(--accent)' : 'var(--border)'}`,
+                padding: '8px 13px', borderRadius: 99, flexShrink: 0,
+                transition: 'background .2s, color .2s, border-color .2s',
+                opacity: !currentVideo?.jellyfinId ? 0.45 : 1,
+              }}
+            >
+              <span
+                className={heartPopping ? 'heart-pop' : undefined}
+                onAnimationEnd={() => setHeartPopping(false)}
+                style={{ display: 'grid', placeItems: 'center' }}
+              >
+                <Icon name="heart" size={15} style={{ color: 'var(--accent)' }} />
+              </span>
+              {isFaved ? 'Loved' : 'Loving this'}
+            </button>
           </div>
         )}
       </div>

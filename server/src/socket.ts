@@ -54,8 +54,8 @@ export function setupSocket(io: Server): void {
       io.emit('server:stats', getOnlineStats());
     });
 
-    socket.on('room:join_or_create', ({ pin, username }: { pin: string; username: string }) => {
-      const room = joinOrCreateRoom(pin, socket.id, username);
+    socket.on('room:join_or_create', ({ pin, username, avatar }: { pin: string; username: string; avatar?: string | null }) => {
+      const room = joinOrCreateRoom(pin, socket.id, username, avatar);
       currentPin = pin;
       socket.join(pin);
       const syncedRoom = {

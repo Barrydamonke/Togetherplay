@@ -74,13 +74,22 @@ export function Sidebar({ room, membersCollapsed, onToggleMembersCollapsed }: Pr
             {room.members.map((m, i) => (
               <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 8px', borderRadius: 'var(--r-sm)' }}>
                 <span style={{ position: 'relative', flexShrink: 0 }}>
-                  <span style={{
-                    width: 30, height: 30, borderRadius: '50%',
-                    background: memberColor(i), color: '#fff',
-                    display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
-                  }}>
-                    {m.username[0].toUpperCase()}
-                  </span>
+                  {m.avatar ? (
+                    <img
+                      src={m.avatar}
+                      alt={m.username}
+                      style={{ width: 30, height: 30, borderRadius: '50%', display: 'block' }}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span style={{
+                      width: 30, height: 30, borderRadius: '50%',
+                      background: memberColor(i), color: '#fff',
+                      display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 13,
+                    }}>
+                      {m.username[0].toUpperCase()}
+                    </span>
+                  )}
                   <span style={{
                     position: 'absolute', right: -1, bottom: -1,
                     width: 10, height: 10, borderRadius: '50%',

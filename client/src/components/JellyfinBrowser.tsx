@@ -18,6 +18,7 @@ import {
   PLAYABLE_TYPES,
   JellyfinItem,
 } from '../lib/jellyfin';
+import { getFavourites, Favourite } from '../lib/favourites';
 import { Video } from '../types';
 import { Icon } from './Icon';
 
@@ -49,6 +50,7 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
   const [adding, setAdding] = useState<string | null>(null);
   const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
   const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
+  const [favourites] = useState<Favourite[]>(() => getFavourites());
 
   useEffect(() => {
     fetch('/api/jellyfin/health')
@@ -92,6 +94,27 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
   function navigateTo(index: number) {
     setBreadcrumbs((prev) => prev.slice(0, index + 1));
     setSearch('');
+  }
+
+  async function addFavToQueue(fav: Favourite) {
+    setAdding(fav.jellyfinId);
+    try {
+      const { streamUrl, isHls } = await getStreamUrl(fav.jellyfinId);
+      onAdd({
+        id: generateId(),
+        title: fav.title,
+        source: 'jellyfin',
+        streamUrl,
+        isHls,
+        thumbnailUrl: fav.thumbnailUrl,
+        duration: fav.duration,
+        jellyfinId: fav.jellyfinId,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get stream URL.');
+    } finally {
+      setAdding(null);
+    }
   }
 
   async function addToQueue(item: JellyfinItem) {
@@ -212,6 +235,59 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
 
         {/* Items */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+          {/* Favourites — only shown when not actively searching */}
+          {!search.trim() && favourites.length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 8px 4px', fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
+                <Icon name="heart" size={13} style={{ color: 'var(--accent)' }} /> Favourites
+              </div>
+              {favourites.map((fav) => (
+                <div key={fav.jellyfinId} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: 10, borderRadius: 'var(--r-md)' }}>
+                  <div style={{
+                    width: 44, height: 62, borderRadius: 8, flexShrink: 0, overflow: 'hidden',
+                    background: thumbGradient(fav.title),
+                  }}>
+                    {fav.thumbnailUrl && (
+                      <img
+                        src={fav.thumbnailUrl}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fav.title}</div>
+                    {fav.duration && (
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-faint)' }}>
+                        {Math.floor(fav.duration / 3600) > 0
+                          ? `${Math.floor(fav.duration / 3600)}h ${String(Math.floor((fav.duration % 3600) / 60)).padStart(2, '0')}m`
+                          : `${Math.floor(fav.duration / 60)}:${String(fav.duration % 60).padStart(2, '0')}`}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => addFavToQueue(fav)}
+                    disabled={adding === fav.jellyfinId}
+                    style={{
+                      padding: '8px 15px', borderRadius: 'var(--r-sm)', border: 'none',
+                      background: 'var(--accent)', color: 'var(--accent-ink)',
+                      fontWeight: 800, fontSize: 13, opacity: adding === fav.jellyfinId ? 0.5 : 1,
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    <Icon name="plus" size={15} /> {adding === fav.jellyfinId ? '…' : 'Queue'}
+                  </button>
+                </div>
+              ))}
+              <div style={{ height: 1, background: 'var(--border-soft)', margin: '6px 8px 2px' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 8px 4px', fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
+                <Icon name="folder" size={13} /> Library
+              </div>
+            </>
+          )}
+
           {loading && (
             <p style={{ textAlign: 'center', color: 'var(--text-faint)', fontWeight: 600, padding: '30px 0' }}>Loading…</p>
           )}

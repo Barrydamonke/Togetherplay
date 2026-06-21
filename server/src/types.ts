@@ -2,6 +2,7 @@ export interface Member {
   id: string;
   username: string;
   isHost: boolean;
+  avatar?: string | null;
 }
 
 export interface Video {

@@ -52,7 +52,7 @@ export function getRoom(pin: string): Room | undefined {
   return rooms.get(pin);
 }
 
-export function joinRoom(pin: string, memberId: string, username: string): Room | null {
+export function joinRoom(pin: string, memberId: string, username: string, avatar?: string | null): Room | null {
   const room = rooms.get(pin);
   if (!room) return null;
 
@@ -66,7 +66,7 @@ export function joinRoom(pin: string, memberId: string, username: string): Room 
   if (!room.members.find((m: Member) => m.id === memberId)) {
     // If the room is empty (grace period), the first person back becomes host.
     const isFirstMember = room.members.length === 0;
-    room.members.push({ id: memberId, username, isHost: isFirstMember });
+    room.members.push({ id: memberId, username, isHost: isFirstMember, avatar });
     if (isFirstMember) room.hostId = memberId;
   }
 
@@ -125,10 +125,10 @@ export function getAllRooms(): RoomSummary[] {
 // Used by Discord Activity: joins existing room or creates one with the given PIN.
 // instanceId is shared across all users in the same Activity session, so whoever
 // arrives first creates the room and everyone else joins it.
-export function joinOrCreateRoom(pin: string, memberId: string, username: string): Room {
+export function joinOrCreateRoom(pin: string, memberId: string, username: string, avatar?: string | null): Room {
   const existing = rooms.get(pin);
   if (existing) {
-    return joinRoom(pin, memberId, username) ?? existing;
+    return joinRoom(pin, memberId, username, avatar) ?? existing;
   }
   const room: Room = {
     pin,
@@ -136,7 +136,7 @@ export function joinOrCreateRoom(pin: string, memberId: string, username: string
     hidden: true,
     viewerCanManageQueue: false,
     viewerCanControl: false,
-    members: [{ id: memberId, username, isHost: true }],
+    members: [{ id: memberId, username, isHost: true, avatar }],
     queue: [],
     currentVideoIndex: -1,
     playback: { playing: false, timestamp: 0, lastSyncedAt: Date.now() },

@@ -137,6 +137,15 @@ button:focus-visible {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes heartPop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.55); }
+  65%  { transform: scale(0.88); }
+  100% { transform: scale(1); }
+}
+.heart-pop {
+  animation: heartPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .animate-float-up {
