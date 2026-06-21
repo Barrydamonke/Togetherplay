@@ -17,6 +17,8 @@ interface Props {
   onSetAspectRatio: (ratio: AspectRatio) => void;
   showStats: boolean;
   onSetShowStats: (v: boolean) => void;
+  sidebarWidth?: number;
+  onSetSidebarWidth?: (w: number) => void;
   onRename: (name: string) => void;
   onUpdateSettings: (settings: Partial<{ hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean; idleGameUrl: string }>) => void;
   onClose: () => void;
@@ -74,7 +76,7 @@ function SettingRow({ label, description, on, onToggle }: { label: string; descr
   );
 }
 
-export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSetAspectRatio, showStats, onSetShowStats, onRename, onUpdateSettings, onClose }: Props) {
+export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSetAspectRatio, showStats, onSetShowStats, sidebarWidth, onSetSidebarWidth, onRename, onUpdateSettings, onClose }: Props) {
   const [name, setName] = useState(currentUsername);
   const [nameSaved, setNameSaved] = useState(false);
   const [idleGameUrl, setIdleGameUrl] = useState(room.idleGameUrl ?? '');
@@ -111,6 +113,8 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 'var(--r-xl)', boxShadow: 'var(--shadow)',
           overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+          maxHeight: 'calc(100vh - 40px)',
         }}
       >
         {/* Header */}
@@ -149,7 +153,7 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
           </button>
         </div>
 
-        <div style={{ padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: 24, overflowY: 'auto', flex: 1 }}>
           {/* Your name */}
           <section>
             <p style={sectionHead}><Icon name="users" size={13} /> Your name</p>
@@ -220,6 +224,36 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
               </div>
               <Toggle on={showStats} onToggle={() => onSetShowStats(!showStats)} />
             </div>
+
+            {sidebarWidth !== undefined && onSetSidebarWidth && (
+              <div style={{ paddingTop: 14, borderTop: '1px solid var(--border-soft)', marginTop: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Sidebar width</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      min={220}
+                      max={560}
+                      value={sidebarWidth}
+                      onChange={(e) => onSetSidebarWidth(parseInt(e.target.value, 10))}
+                      style={{ ...inputStyle, width: 72, flex: 'none', padding: '6px 10px', textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: 12.5, color: 'var(--text-faint)', fontWeight: 600 }}>px</span>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={220}
+                  max={560}
+                  value={sidebarWidth}
+                  onChange={(e) => onSetSidebarWidth(parseInt(e.target.value, 10))}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-faint)', fontWeight: 600, marginTop: 2 }}>
+                  <span>220</span><span>560</span>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Host-only room settings */}

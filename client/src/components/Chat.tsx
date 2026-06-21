@@ -7,6 +7,8 @@ interface Props {
   currentMemberId: string;
   isMobile?: boolean;
   rateLimited?: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onSend: (text: string) => void;
 }
 
@@ -22,7 +24,7 @@ function formatVideoTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function Chat({ messages, currentMemberId, isMobile, rateLimited, onSend }: Props) {
+export function Chat({ messages, currentMemberId, isMobile, rateLimited, collapsed, onToggleCollapse, onSend }: Props) {
   const [text, setText] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -38,25 +40,44 @@ export function Chat({ messages, currentMemberId, isMobile, rateLimited, onSend 
     setText('');
   }
 
+  // On desktop, Chat is a flex child of aside and fills remaining space via flex: 1.
+  // On mobile, aside scrolls so we use a clamped fixed height instead.
+  const outerStyle: React.CSSProperties = isMobile
+    ? {
+        display: 'flex', flexDirection: 'column',
+        height: collapsed ? 'auto' : 'clamp(220px, 36vh, 320px)',
+        borderTop: '1px solid var(--border)',
+        flexShrink: 0,
+      }
+    : {
+        display: 'flex', flexDirection: 'column',
+        flex: collapsed ? '0 0 auto' : '1 1 0',
+        minHeight: 0,
+        overflow: 'hidden',
+        borderTop: '1px solid var(--border)',
+      };
+
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      height: isMobile ? 'clamp(220px, 36vh, 320px)' : 'clamp(180px, 30vh, 248px)',
-      borderTop: '1px solid var(--border)',
-      flexShrink: 0,
-    }}>
-      {/* Section label */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 7,
-        padding: '0 16px', height: 34, flexShrink: 0,
-        fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em',
-        textTransform: 'uppercase', color: 'var(--text-faint)',
-      }}>
-        <Icon name="chat" size={13} /> Chat
+    <div style={outerStyle}>
+      {/* Section label — clickable to collapse when onToggleCollapse provided */}
+      <div
+        onClick={onToggleCollapse}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 16px', height: 34, flexShrink: 0,
+          cursor: onToggleCollapse ? 'pointer' : undefined,
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
+          <Icon name="chat" size={13} /> Chat
+        </span>
+        {onToggleCollapse && (
+          <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={13} style={{ color: 'var(--text-faint)' }} />
+        )}
       </div>
 
-      {/* Messages */}
-      <div style={{
+      {/* Messages + input — hidden when collapsed */}
+      {!collapsed && (<><div style={{
         flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
         padding: '4px 14px', display: 'flex', flexDirection: 'column', gap: 9,
       }}>
@@ -149,6 +170,7 @@ export function Chat({ messages, currentMemberId, isMobile, rateLimited, onSend 
           <Icon name="send" size={17} />
         </button>
       </div>
+      </>)}
     </div>
   );
 }
