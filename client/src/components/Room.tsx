@@ -138,49 +138,68 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
   const canManageQueue = isHost || room.viewerCanManageQueue;
 
   useEffect(() => {
-    socket.on('room:members_updated', ({ members, hostId }: { members: Member[]; hostId: string }) => {
+    function onMembersUpdated({ members, hostId }: { members: Member[]; hostId: string }) {
       setRoom((prev) => ({ ...prev, members, hostId }));
-    });
-
-    socket.on('playback:update', ({ playback }: { playback: PlaybackState }) => {
+    }
+    function onPlaybackUpdate({ playback }: { playback: PlaybackState }) {
       setRoom((prev) => ({ ...prev, playback }));
-    });
-
-    socket.on(
-      'queue:update',
-      ({ queue, currentVideoIndex }: { queue: Video[]; currentVideoIndex: number }) => {
-        setRoom((prev) => ({ ...prev, queue, currentVideoIndex }));
-      },
-    );
-
-    socket.on('chat:message', ({ message }: { message: ChatMessage }) => {
-      setRoom((prev) => ({ ...prev, chat: [...prev.chat, message] }));
-    });
-
-    socket.on('room:host_changed', ({ newHostId, newHostUsername }: { newHostId: string; newHostUsername: string }) => {
+    }
+    function onQueueUpdate({ queue, currentVideoIndex }: { queue: Video[]; currentVideoIndex: number }) {
+      setRoom((prev) => ({ ...prev, queue, currentVideoIndex }));
+    }
+    function onChatMessage({ message }: { message: ChatMessage }) {
+      setRoom((prev) => {
+        const chat = [...prev.chat, message];
+        if (chat.length > 200) chat.splice(0, chat.length - 200);
+        return { ...prev, chat };
+      });
+    }
+    function onHostChanged({ newHostId, newHostUsername }: { newHostId: string; newHostUsername: string }) {
       if (newHostId === memberId) {
         addToast('You are now the host');
       } else {
         addToast(`${newHostUsername} is now the host`);
       }
-    });
+    }
+    function onSettingsUpdated(settings: { hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean; idleGameUrl?: string }) {
+      setRoom((prev) => ({ ...prev, ...settings }));
+    }
 
-    socket.on(
-      'room:settings_updated',
-      (settings: { hidden: boolean; viewerCanManageQueue: boolean; viewerCanControl: boolean; idleGameUrl?: string }) => {
-        setRoom((prev) => ({ ...prev, ...settings }));
-      },
-    );
+    socket.on('room:members_updated', onMembersUpdated);
+    socket.on('playback:update', onPlaybackUpdate);
+    socket.on('queue:update', onQueueUpdate);
+    socket.on('chat:message', onChatMessage);
+    socket.on('room:host_changed', onHostChanged);
+    socket.on('room:settings_updated', onSettingsUpdated);
 
     return () => {
-      socket.off('room:members_updated');
-      socket.off('playback:update');
-      socket.off('queue:update');
-      socket.off('chat:message');
-      socket.off('room:host_changed');
-      socket.off('room:settings_updated');
+      socket.off('room:members_updated', onMembersUpdated);
+      socket.off('playback:update', onPlaybackUpdate);
+      socket.off('queue:update', onQueueUpdate);
+      socket.off('chat:message', onChatMessage);
+      socket.off('room:host_changed', onHostChanged);
+      socket.off('room:settings_updated', onSettingsUpdated);
     };
   }, [socket, memberId, addToast]);
+
+  // Sync room state from the server after a reconnect. App.tsx receives a fresh
+  // room:joined payload and updates initialRoom — this effect propagates it here.
+  // On first mount Object.is bails out immediately (same reference), so no extra render.
+  useEffect(() => {
+    setRoom(initialRoom);
+  }, [initialRoom]);
+
+  const [socketConnected, setSocketConnected] = useState(socket.connected);
+  useEffect(() => {
+    const onConnect = () => setSocketConnected(true);
+    const onDisconnect = () => setSocketConnected(false);
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+    };
+  }, [socket]);
 
   const currentVideo = room.currentVideoIndex >= 0 ? room.queue[room.currentVideoIndex] : null;
 
@@ -529,6 +548,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           currentMemberId={memberId}
           isMobile={isMobile}
           rateLimited={rateLimited}
+          disconnected={!socketConnected}
           collapsed={chatCollapsed}
           onToggleCollapse={() => setChatCollapsed((v) => !v)}
           onSend={(text) => {

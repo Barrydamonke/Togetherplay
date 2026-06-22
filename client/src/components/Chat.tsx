@@ -7,6 +7,7 @@ interface Props {
   currentMemberId: string;
   isMobile?: boolean;
   rateLimited?: boolean;
+  disconnected?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   onSend: (text: string) => void;
@@ -24,7 +25,7 @@ function formatVideoTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function Chat({ messages, currentMemberId, isMobile, rateLimited, collapsed, onToggleCollapse, onSend }: Props) {
+export function Chat({ messages, currentMemberId, isMobile, rateLimited, disconnected, collapsed, onToggleCollapse, onSend }: Props) {
   const [text, setText] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -141,30 +142,41 @@ export function Chat({ messages, currentMemberId, isMobile, rateLimited, collaps
         <div ref={bottomRef} />
       </div>
 
+      {/* Reconnecting banner */}
+      {disconnected && (
+        <div style={{
+          margin: '0 10px 6px', padding: '7px 12px', borderRadius: 'var(--r-sm)',
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          fontSize: 12.5, fontWeight: 700, color: 'var(--text-dim)', textAlign: 'center',
+        }}>
+          Reconnecting…
+        </div>
+      )}
+
       {/* Input row */}
       <div style={{ display: 'flex', gap: 8, padding: 10, flexShrink: 0 }}>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder={rateLimited ? '🌿 touch some grass first…' : 'Say something…'}
+          placeholder={disconnected ? 'Reconnecting…' : rateLimited ? '🌿 touch some grass first…' : 'Say something…'}
           maxLength={500}
-          disabled={rateLimited}
+          disabled={rateLimited || disconnected}
           style={{
             flex: 1, padding: '10px 14px', borderRadius: 99,
             border: '1.5px solid var(--border)', background: 'var(--surface-2)',
             color: 'var(--text)', fontSize: 13.5, fontWeight: 600, outline: 'none',
-            opacity: rateLimited ? 0.45 : 1,
+            opacity: rateLimited || disconnected ? 0.45 : 1,
           }}
         />
         <button
           onClick={send}
-          disabled={rateLimited}
+          disabled={rateLimited || disconnected}
           style={{
             width: 40, height: 40, borderRadius: '50%', border: 'none', flexShrink: 0,
             background: 'var(--accent)', color: 'var(--accent-ink)',
             display: 'grid', placeItems: 'center',
-            opacity: rateLimited ? 0.45 : 1,
+            opacity: rateLimited || disconnected ? 0.45 : 1,
           }}
         >
           <Icon name="send" size={17} />

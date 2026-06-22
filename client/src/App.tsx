@@ -32,6 +32,10 @@ export default function App({ discordContext }: Props) {
     const socket = getSocket();
 
     const handleReconnect = () => {
+      // Drop any pending listeners from a previous reconnect attempt that never completed.
+      socket.off('room:joined');
+      socket.off('room:error');
+
       if (discordContext) {
         const stored = sessionStorage.getItem(SESSION_KEY);
         const username = stored
