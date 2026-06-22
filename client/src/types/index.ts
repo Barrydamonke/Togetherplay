@@ -65,6 +65,7 @@ export interface Room {
   pin: string;
   hostId: string;
   hidden: boolean;
+  discordOnly?: boolean;
   viewerCanManageQueue: boolean;
   viewerCanControl: boolean;
   idleGameUrl?: string;

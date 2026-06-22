@@ -145,6 +145,7 @@ export function joinOrCreateRoom(instanceId: string, memberId: string, username:
     pin,
     hostId: memberId,
     hidden: true,
+    discordOnly: true,
     viewerCanManageQueue: false,
     viewerCanControl: false,
     members: [{ id: memberId, username, isHost: true, avatar }],

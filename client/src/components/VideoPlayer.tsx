@@ -64,7 +64,9 @@ interface Props {
   onToggleSidebar?: () => void;
 }
 
-const SYNC_TOLERANCE_SECONDS = 2;
+const SYNC_TOLERANCE_PLAYING = 2;   // drift allowed while playing
+const SYNC_TOLERANCE_PAUSED  = 0.3; // snap tightly on a pause event
+const PERIODIC_SYNC_THRESHOLD = 10; // seconds before a background correction kicks in
 
 function formatTime(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00';
@@ -274,7 +276,8 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
           ? playback.timestamp + (Date.now() - playback.lastSyncedAt) / 1000
           : playback.timestamp;
 
-        if (Math.abs(video.currentTime - target) > SYNC_TOLERANCE_SECONDS) {
+        const tolerance = playback.playing ? SYNC_TOLERANCE_PLAYING : SYNC_TOLERANCE_PAUSED;
+        if (Math.abs(video.currentTime - target) > tolerance) {
           video.currentTime = target;
         }
 
@@ -309,6 +312,23 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
 
     sync();
   }, [playback]);
+
+  // Background drift correction for viewers: if local playback drifts more than
+  // PERIODIC_SYNC_THRESHOLD seconds from the host's expected position, snap back.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (isHostRef.current) return;
+      const video = videoRef.current;
+      if (!video || !playbackRef.current.playing) return;
+      const expected =
+        playbackRef.current.timestamp +
+        (Date.now() - playbackRef.current.lastSyncedAt) / 1000;
+      if (Math.abs(video.currentTime - expected) > PERIODIC_SYNC_THRESHOLD) {
+        video.currentTime = expected;
+      }
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   // Mirror native video state into React for the custom controls UI.
   useEffect(() => {
@@ -414,8 +434,9 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       video.play().catch(() => {});
       onPlay(video.currentTime);
     } else {
+      const ts = video.currentTime;
       video.pause();
-      onPause(video.currentTime);
+      onPause(ts);
     }
   };
 

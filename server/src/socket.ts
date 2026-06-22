@@ -30,6 +30,11 @@ export function setupSocket(io: Server): void {
     });
 
     socket.on('room:join', ({ pin, username }: { pin: string; username: string }) => {
+      const existing = getRoom(pin);
+      if (existing?.discordOnly) {
+        socket.emit('room:error', { message: 'This room is a Discord session. Join via Discord.' });
+        return;
+      }
       const room = joinRoom(pin, socket.id, username);
       if (!room) {
         socket.emit('room:error', { message: 'Room not found. Check your PIN.' });
