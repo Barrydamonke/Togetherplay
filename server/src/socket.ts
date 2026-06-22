@@ -54,10 +54,10 @@ export function setupSocket(io: Server): void {
       io.emit('server:stats', getOnlineStats());
     });
 
-    socket.on('room:join_or_create', ({ pin, username, avatar }: { pin: string; username: string; avatar?: string | null }) => {
-      const room = joinOrCreateRoom(pin, socket.id, username, avatar);
-      currentPin = pin;
-      socket.join(pin);
+    socket.on('room:join_or_create', ({ pin: instanceId, username, avatar }: { pin: string; username: string; avatar?: string | null }) => {
+      const room = joinOrCreateRoom(instanceId, socket.id, username, avatar);
+      currentPin = room.pin;
+      socket.join(room.pin);
       const syncedRoom = {
         ...room,
         playback: {
@@ -67,7 +67,7 @@ export function setupSocket(io: Server): void {
         },
       };
       socket.emit('room:joined', { room: syncedRoom, isHost: room.hostId === socket.id });
-      socket.to(pin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
+      socket.to(room.pin).emit('room:members_updated', { members: room.members, hostId: room.hostId });
       io.emit('server:stats', getOnlineStats());
     });
 
