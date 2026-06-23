@@ -273,9 +273,12 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     const sync = async () => {
       syncingRef.current = true;
       try {
-        const target = playback.playing
+        const rawTarget = playback.playing
           ? playback.timestamp + (Date.now() - playback.lastSyncedAt) / 1000
           : playback.timestamp;
+        const target = isFinite(video.duration) && video.duration > 0
+          ? Math.max(0, Math.min(rawTarget, video.duration))
+          : Math.max(0, rawTarget);
 
         const tolerance = playback.playing ? SYNC_TOLERANCE_PLAYING : SYNC_TOLERANCE_PAUSED;
         if (Math.abs(video.currentTime - target) > tolerance) {
@@ -321,9 +324,12 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       if (isHostRef.current) return;
       const video = videoRef.current;
       if (!video || !playbackRef.current.playing) return;
-      const expected =
+      const rawExpected =
         playbackRef.current.timestamp +
         (Date.now() - playbackRef.current.lastSyncedAt) / 1000;
+      const expected = isFinite(video.duration) && video.duration > 0
+        ? Math.max(0, Math.min(rawExpected, video.duration))
+        : Math.max(0, rawExpected);
       if (Math.abs(video.currentTime - expected) > PERIODIC_SYNC_THRESHOLD) {
         video.currentTime = expected;
       }

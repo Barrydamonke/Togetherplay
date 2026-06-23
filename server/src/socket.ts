@@ -19,6 +19,11 @@ export function setupSocket(io: Server): void {
   io.on('connection', (socket: Socket) => {
     let currentPin: string | null = null;
 
+    // Server-side chat rate limit: max 10 messages per 5 seconds per connection.
+    const chatTimestamps: number[] = [];
+    const CHAT_RATE_LIMIT = 10;
+    const CHAT_RATE_WINDOW = 5000;
+
     socket.emit('server:stats', getOnlineStats());
 
     socket.on('room:create', ({ username, hidden }: { username: string; hidden?: boolean }) => {
@@ -127,10 +132,21 @@ export function setupSocket(io: Server): void {
       const room = getRoom(currentPin);
       if (!room || room.hostId !== socket.id) return;
       room.queue.splice(index, 1);
-      if (room.currentVideoIndex >= room.queue.length) {
-        room.currentVideoIndex = Math.max(0, room.queue.length - 1);
+      if (room.queue.length === 0) {
+        room.currentVideoIndex = -1;
+      } else if (index < room.currentVideoIndex) {
+        // A video before the current one was removed; shift the index down.
+        room.currentVideoIndex -= 1;
+      } else if (index === room.currentVideoIndex) {
+        // The current video was removed; next video slides into the same slot,
+        // but clamp if it was the last item.
+        room.currentVideoIndex = Math.min(room.currentVideoIndex, room.queue.length - 1);
+        // A new video is now current — reset playback so everyone starts from the beginning.
+        room.playback = { playing: true, timestamp: 0, lastSyncedAt: Date.now() };
+        const next = room.queue[room.currentVideoIndex];
+        if (next) emitSystemMessage(io, currentPin, `${next.title} has started playing`);
+        io.to(currentPin).emit('playback:update', { playback: room.playback });
       }
-      if (room.queue.length === 0) room.currentVideoIndex = -1;
       io.to(currentPin).emit('queue:update', {
         queue: room.queue,
         currentVideoIndex: room.currentVideoIndex,
@@ -196,6 +212,10 @@ export function setupSocket(io: Server): void {
       if (!room) return;
       const member = room.members.find((m) => m.id === socket.id);
       if (!member) return;
+      const now = Date.now();
+      while (chatTimestamps.length && chatTimestamps[0] < now - CHAT_RATE_WINDOW) chatTimestamps.shift();
+      if (chatTimestamps.length >= CHAT_RATE_LIMIT) return;
+      chatTimestamps.push(now);
       const message: ChatMessage = {
         id: randomUUID(),
         memberId: socket.id,

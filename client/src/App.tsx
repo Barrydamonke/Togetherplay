@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Room as RoomType } from './types';
 import { Landing } from './components/Landing';
 import { Room } from './components/Room';
@@ -27,25 +27,34 @@ export default function App({ discordContext }: Props) {
     localStorage.setItem('tg-theme', theme);
   }, [theme]);
 
+  // Refs to track handlers registered by the last reconnect attempt so we can
+  // remove exactly those — not the in-flight handlers from handleDiscordJoin.
+  const reconnectJoinedRef = useRef<((...args: unknown[]) => void) | null>(null);
+  const reconnectErrorRef  = useRef<((...args: unknown[]) => void) | null>(null);
+
   // Reconnect: re-join after a dropped connection.
   useEffect(() => {
     const socket = getSocket();
 
     const handleReconnect = () => {
-      // Drop any pending listeners from a previous reconnect attempt that never completed.
-      socket.off('room:joined');
-      socket.off('room:error');
+      // Remove only the listeners registered by a previous reconnect attempt,
+      // not any in-flight listeners from handleDiscordJoin.
+      if (reconnectJoinedRef.current) { socket.off('room:joined', reconnectJoinedRef.current); reconnectJoinedRef.current = null; }
+      if (reconnectErrorRef.current)  { socket.off('room:error',  reconnectErrorRef.current);  reconnectErrorRef.current = null; }
 
       if (discordContext) {
         const stored = sessionStorage.getItem(SESSION_KEY);
         const username = stored
           ? (JSON.parse(stored) as { pin: string; username: string }).username
           : discordContext.username;
-        socket.once('room:joined', ({ room: joinedRoom, isHost: joinedAsHost }) => {
+        const onJoined = ({ room: joinedRoom, isHost: joinedAsHost }: { room: RoomType; isHost: boolean }) => {
           setRoom(joinedRoom);
           setIsHost(joinedAsHost);
           setMemberId(socket.id ?? '');
-        });
+          reconnectJoinedRef.current = null;
+        };
+        reconnectJoinedRef.current = onJoined as (...args: unknown[]) => void;
+        socket.once('room:joined', onJoined);
         socket.emit('room:join_or_create', { pin: discordContext.instanceId, username, avatar: discordContext.avatar });
         return;
       }
@@ -54,16 +63,24 @@ export default function App({ discordContext }: Props) {
       if (!stored) return;
       const { pin, username } = JSON.parse(stored) as { pin: string; username: string };
 
-      socket.once('room:joined', ({ room: joinedRoom, isHost: joinedAsHost }) => {
+      const onJoined = ({ room: joinedRoom, isHost: joinedAsHost }: { room: RoomType; isHost: boolean }) => {
         setRoom(joinedRoom);
         setIsHost(joinedAsHost);
         setMemberId(socket.id ?? '');
-      });
-
-      socket.once('room:error', () => {
+        socket.off('room:error', onError);
+        reconnectJoinedRef.current = null;
+        reconnectErrorRef.current = null;
+      };
+      const onError = () => {
         sessionStorage.removeItem(SESSION_KEY);
-      });
-
+        socket.off('room:joined', onJoined);
+        reconnectJoinedRef.current = null;
+        reconnectErrorRef.current = null;
+      };
+      reconnectJoinedRef.current = onJoined as (...args: unknown[]) => void;
+      reconnectErrorRef.current  = onError  as (...args: unknown[]) => void;
+      socket.once('room:joined', onJoined);
+      socket.once('room:error',  onError);
       socket.emit('room:join', { pin, username });
     };
 

@@ -29,9 +29,12 @@ export function Chat({ messages, currentMemberId, isMobile, rateLimited, disconn
   const [text, setText] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const isBulk = messages.length > prevMessageCountRef.current + 1;
+    prevMessageCountRef.current = messages.length;
+    bottomRef.current?.scrollIntoView({ behavior: isBulk ? 'auto' : 'smooth' });
   }, [messages]);
 
   function send() {

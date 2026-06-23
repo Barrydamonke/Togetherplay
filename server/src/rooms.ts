@@ -127,7 +127,12 @@ export function getAllRooms(): RoomSummary[] {
 // as the room key directly — no separate PIN needed.
 export function joinOrCreateRoom(instanceId: string, memberId: string, username: string, avatar?: string | null): Room {
   const existing = rooms.get(instanceId);
-  if (existing) return joinRoom(instanceId, memberId, username, avatar) ?? existing;
+  if (existing) {
+    const rejoined = joinRoom(instanceId, memberId, username, avatar);
+    if (rejoined) return rejoined;
+    // Room was in the map but joinRoom returned null — it vanished (e.g. cleared by
+    // an admin). Fall through to recreate it rather than returning a stale object.
+  }
 
   const room: Room = {
     pin: instanceId,
