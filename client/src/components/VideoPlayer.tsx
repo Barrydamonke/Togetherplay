@@ -787,15 +787,28 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
             ? `${absDrift.toFixed(1)}s ${syncDrift < 0 ? 'behind' : 'ahead'}`
             : 'In sync';
         return (
-          <div style={{
-            position: 'absolute', top: 16, left: 16,
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '7px 13px', borderRadius: 99,
-            background: 'rgba(10,7,5,.5)', backdropFilter: 'blur(8px)',
-            color: '#fff', fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap',
-            opacity: showControls || outOfSync ? 1 : 0, transition: 'opacity .2s',
-            pointerEvents: 'none',
-          }}>
+          <div
+            onClick={outOfSync ? () => {
+              const video = videoRef.current;
+              const pb = playbackRef.current;
+              if (!video) return;
+              const expected = pb.timestamp + (Date.now() - pb.lastSyncedAt) / 1000;
+              const clamped = isFinite(video.duration) && video.duration > 0
+                ? Math.max(0, Math.min(expected, video.duration))
+                : Math.max(0, expected);
+              video.currentTime = clamped;
+            } : undefined}
+            style={{
+              position: 'absolute', top: 16, left: 16,
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '7px 13px', borderRadius: 99,
+              background: 'rgba(10,7,5,.5)', backdropFilter: 'blur(8px)',
+              color: '#fff', fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap',
+              opacity: showControls || outOfSync ? 1 : 0, transition: 'opacity .2s',
+              pointerEvents: outOfSync ? 'auto' : 'none',
+              cursor: outOfSync ? 'pointer' : 'default',
+            }}
+          >
             <span style={{
               width: 8, height: 8, borderRadius: '50%',
               background: dotColor,
@@ -803,6 +816,9 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
               transition: 'background .4s',
             }} />
             {label}
+            {outOfSync && (
+              <span style={{ fontSize: 11, opacity: 0.75, marginLeft: 2 }}>· tap to sync</span>
+            )}
           </div>
         );
       })()}
