@@ -8,6 +8,7 @@ export interface AppConfig {
   uploadServiceUrl: string;
   githubRepoUrl: string;
   landingMessage: string;
+  suggestionWebhookUrl: string;
 }
 
 const CONFIG_PATH = join(process.env.DATA_DIR ?? process.cwd(), 'config.json');
@@ -23,6 +24,7 @@ function load(): AppConfig {
         uploadServiceUrl: stored.uploadServiceUrl ?? '',
         githubRepoUrl: stored.githubRepoUrl ?? 'https://github.com/Barrydamonke/Togetherplay',
         landingMessage: stored.landingMessage ?? '',
+        suggestionWebhookUrl: stored.suggestionWebhookUrl ?? '',
       };
     } catch {}
   }
@@ -33,6 +35,7 @@ function load(): AppConfig {
     uploadServiceUrl: process.env.UPLOAD_SERVICE_URL ?? '',
     githubRepoUrl: 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: '',
+    suggestionWebhookUrl: '',
   };
 }
 

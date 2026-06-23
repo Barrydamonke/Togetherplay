@@ -12,6 +12,7 @@ import { useToasts, ToastContainer } from './Toast';
 import { useIsMobile } from '../lib/useIsMobile';
 import { useRateLimit } from '../lib/useRateLimit';
 import { isFavourite, addFavourite, removeFavourite } from '../lib/favourites';
+import { SuggestionsModal } from './SuggestionsModal';
 
 interface Props {
   initialRoom: RoomType;
@@ -88,6 +89,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
 
   // Queue drag state
   const [showBrowser, setShowBrowser] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const dragIndexRef = useRef<number | null>(null);
 
@@ -436,21 +438,34 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
               <Icon name="list" size={13} /> Up next
               <Icon name={queueCollapsed ? 'chevron-down' : 'chevron-up'} size={13} style={{ color: 'var(--text-faint)' }} />
             </span>
-            {canManageQueue && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <button
-                onClick={() => setShowBrowser(true)}
-                disabled={rateLimited}
+                onClick={() => setShowSuggestions(true)}
+                title="Suggestions"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  fontSize: 12.5, fontWeight: 800, color: 'var(--accent)',
-                  background: 'var(--accent-soft)', border: 'none',
-                  padding: '5px 11px', borderRadius: 99,
-                  opacity: rateLimited ? 0.45 : 1,
+                  width: 26, height: 26, borderRadius: 8, border: '1px solid var(--border)',
+                  background: 'none', color: 'var(--text-faint)',
+                  display: 'grid', placeItems: 'center', cursor: 'pointer',
                 }}
               >
-                <Icon name="plus" size={14} /> Add
+                <Icon name="lightbulb" size={13} />
               </button>
-            )}
+              {canManageQueue && (
+                <button
+                  onClick={() => setShowBrowser(true)}
+                  disabled={rateLimited}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    fontSize: 12.5, fontWeight: 800, color: 'var(--accent)',
+                    background: 'var(--accent-soft)', border: 'none',
+                    padding: '5px 11px', borderRadius: 99,
+                    opacity: rateLimited ? 0.45 : 1,
+                  }}
+                >
+                  <Icon name="plus" size={14} /> Add
+                </button>
+              )}
+            </div>
           </div>
 
           {!queueCollapsed && (
@@ -568,6 +583,13 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
             setShowBrowser(false);
           }}
           onClose={() => setShowBrowser(false)}
+        />
+      )}
+
+      {showSuggestions && (
+        <SuggestionsModal
+          roomPin={room.pin}
+          onClose={() => setShowSuggestions(false)}
         />
       )}
 

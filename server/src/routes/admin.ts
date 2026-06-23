@@ -37,11 +37,12 @@ router.get('/config', (req: Request, res: Response) => {
 
 router.post('/config', (req: Request, res: Response) => {
   if (!checkAuth(req, res)) return;
-  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl, githubRepoUrl, landingMessage } = req.body as AppConfig;
+  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl, githubRepoUrl, landingMessage, suggestionWebhookUrl } = req.body as AppConfig;
   saveConfig({
     jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl,
     githubRepoUrl: githubRepoUrl || 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: landingMessage ?? '',
+    suggestionWebhookUrl: suggestionWebhookUrl ?? '',
   });
   res.json({ ok: true });
 });

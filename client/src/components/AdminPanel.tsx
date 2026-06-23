@@ -13,6 +13,7 @@ interface Config {
   uploadServiceUrl: string;
   githubRepoUrl: string;
   landingMessage: string;
+  suggestionWebhookUrl: string;
 }
 
 const inputStyle: CSSProperties = {
@@ -110,7 +111,7 @@ export function AdminPanel({ onClose }: Props) {
   const [loginLoading, setLoginLoading] = useState(false);
   const [config, setConfig] = useState<Config>({
     jellyfinUrl: '', jellyfinApiKey: '', jellyfinUserId: '', uploadServiceUrl: '',
-    githubRepoUrl: '', landingMessage: '',
+    githubRepoUrl: '', landingMessage: '', suggestionWebhookUrl: '',
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const updateCheck = useUpdateCheck(config.githubRepoUrl);
@@ -410,6 +411,17 @@ export function AdminPanel({ onClose }: Props) {
                 value={config.githubRepoUrl}
                 onChange={patch('githubRepoUrl')}
                 placeholder="https://github.com/Barrydamonke/Togetherplay"
+              />
+            </section>
+
+            {/* Suggestions section */}
+            <section>
+              <SectionHead label="Suggestions" />
+              <Field
+                label="Discord Webhook URL"
+                value={config.suggestionWebhookUrl}
+                onChange={patch('suggestionWebhookUrl')}
+                placeholder="https://discord.com/api/webhooks/…"
               />
             </section>
 

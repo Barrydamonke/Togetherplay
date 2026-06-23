@@ -1,7 +1,7 @@
 services:
   togetherplay:
     build:
-      context: /mnt/user/appdata/togetherplay
+      context: /change/me # path to the folder of togetherplay data (config, logs, etc.)
       args:
         # Baked into the client bundle at build time.
         # Set this to your Discord Application ID, then rebuild the image.
@@ -16,5 +16,5 @@ services:
       - DISCORD_CLIENT_ID=
       - DISCORD_CLIENT_SECRET=
     volumes:
-      - /mnt/user/appdata/togetherplay/data:/data
+      - /change/me:/data # path to the folder of togetherplay data (config, logs, etc.)
     restart: unless-stopped

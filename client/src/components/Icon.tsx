@@ -105,6 +105,25 @@ export function Icon({ name, size = 20, stroke = 2, style, className }: IconProp
     sparkle: (
       <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" />
     ),
+    lightbulb: (
+      <>
+        <path d="M15 14c.2-1 .7-1.7 1.5-2.5C17.9 10.1 19 8.2 19 6a7 7 0 1 0-14 0c0 2.2 1.1 4.1 2.5 5.5.8.8 1.3 1.5 1.5 2.5" />
+        <path d="M9 18h6M10 22h4" />
+      </>
+    ),
+    megaphone: (
+      <>
+        <path d="M3 11v2" />
+        <path d="M5 9v6l3 2h9l1-8H8L5 9Z" />
+        <path d="M19 9c.7.5 1 1.5 1 3s-.3 2.5-1 3" />
+      </>
+    ),
+    flag: (
+      <>
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1="4" y1="22" x2="4" y2="15" />
+      </>
+    ),
     volume: (
       <>
         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none" />
