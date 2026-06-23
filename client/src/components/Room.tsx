@@ -20,6 +20,7 @@ interface Props {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onLeave?: () => void;
+  channelName?: string | null;
 }
 
 const MIN_SIDEBAR_WIDTH = 220;
@@ -40,7 +41,7 @@ function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: Props) {
+export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, channelName }: Props) {
   const [room, setRoom] = useState<RoomType>(initialRoom);
   const [showSettings, setShowSettings] = useState(false);
   const { toasts, addToast } = useToasts();
@@ -410,6 +411,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave }: P
           room={room}
           membersCollapsed={membersCollapsed}
           onToggleMembersCollapsed={() => setMembersCollapsed((v) => !v)}
+          channelName={channelName}
         />
 
         {/* Queue — flex: 1 so it takes remaining space; collapses to header only */}

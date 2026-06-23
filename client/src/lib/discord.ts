@@ -4,6 +4,7 @@ export interface DiscordContext {
   username: string;
   avatar: string | null;
   instanceId: string;
+  channelName: string | null;
 }
 
 // Set to true after a successful Discord Activity init.
@@ -29,7 +30,7 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
       response_type: 'code',
       state: '',
       prompt: 'none',
-      scope: ['identify'],
+      scope: ['identify', 'guilds'],
     });
 
     const res = await fetch('/api/discord/token', {
@@ -64,12 +65,23 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
 
     await sdk.commands.authenticate({ access_token });
 
+    let channelName: string | null = null;
+    try {
+      if (sdk.channelId) {
+        const channel = await sdk.commands.getChannel({ channel_id: sdk.channelId });
+        channelName = channel.name ?? null;
+      }
+    } catch {
+      // best-effort — channel name stays null
+    }
+
     isDiscordActivity = true;
 
     return {
       username: user.username,
       avatar: user.avatar,
       instanceId: sdk.instanceId,
+      channelName,
     };
   } catch (err) {
     console.error('[Discord] Init failed, falling back to normal mode:', err);

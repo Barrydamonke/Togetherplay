@@ -180,6 +180,7 @@ export default function App({ discordContext }: Props) {
       theme={theme}
       onToggleTheme={toggleTheme}
       onLeave={discordContext ? undefined : handleLeave}
+      channelName={discordContext?.channelName ?? null}
     />
   );
 }

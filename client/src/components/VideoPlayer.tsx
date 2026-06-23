@@ -104,6 +104,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const [activeCue, setActiveCue] = useState('');
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const subtitleCuesRef = useRef<Cue[]>([]);
+  const [syncDrift, setSyncDrift] = useState(0); // seconds: negative = behind host, positive = ahead
 
   const isMobile = useIsMobile();
   const nativeHeight = isMobile && !isFullscreen;
@@ -327,6 +328,22 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         video.currentTime = expected;
       }
     }, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Update drift display every second for the sync indicator pill.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || isHostRef.current || !playbackRef.current.playing) {
+        setSyncDrift(0);
+        return;
+      }
+      const expected =
+        playbackRef.current.timestamp +
+        (Date.now() - playbackRef.current.lastSyncedAt) / 1000;
+      setSyncDrift(video.currentTime - expected);
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -752,22 +769,37 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       )}
 
       {/* Sync pill */}
-      <div style={{
-        position: 'absolute', top: 16, left: 16,
-        display: 'inline-flex', alignItems: 'center', gap: 8,
-        padding: '7px 13px', borderRadius: 99,
-        background: 'rgba(10,7,5,.5)', backdropFilter: 'blur(8px)',
-        color: '#fff', fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap',
-        opacity: showControls ? 1 : 0, transition: 'opacity .2s',
-        pointerEvents: 'none',
-      }}>
-        <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: 'var(--online)',
-          animation: 'blink 2s infinite',
-        }} />
-        {isPlaying ? 'In sync' : 'Paused'}
-      </div>
+      {(() => {
+        const absDrift = Math.abs(syncDrift);
+        const outOfSync = !isHost && isPlaying && absDrift >= SYNC_TOLERANCE_PLAYING;
+        const dotColor = !isPlaying
+          ? 'rgba(255,255,255,0.3)'
+          : outOfSync ? '#f5a623' : 'var(--online)';
+        const label = !isPlaying
+          ? 'Paused'
+          : outOfSync
+            ? `${absDrift.toFixed(1)}s ${syncDrift < 0 ? 'behind' : 'ahead'}`
+            : 'In sync';
+        return (
+          <div style={{
+            position: 'absolute', top: 16, left: 16,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '7px 13px', borderRadius: 99,
+            background: 'rgba(10,7,5,.5)', backdropFilter: 'blur(8px)',
+            color: '#fff', fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap',
+            opacity: showControls || outOfSync ? 1 : 0, transition: 'opacity .2s',
+            pointerEvents: 'none',
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: dotColor,
+              animation: outOfSync ? undefined : 'blink 2s infinite',
+              transition: 'background .4s',
+            }} />
+            {label}
+          </div>
+        );
+      })()}
 
       {showStats && (
         <div style={{

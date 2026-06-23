@@ -2,8 +2,6 @@ import { Room, Member } from './types';
 
 const rooms = new Map<string, Room>();
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
-const instanceRooms = new Map<string, string>(); // Discord instanceId → room pin
-const pinToInstance = new Map<string, string>();  // room pin → Discord instanceId
 
 function generatePin(): string {
   let pin: string;
@@ -92,9 +90,6 @@ export function leaveRoom(pin: string, memberId: string): LeaveResult {
   if (room.members.length === 0) {
     // Start a 60-second grace period before deleting the room.
     const timer = setTimeout(() => {
-      const iid = pinToInstance.get(pin);
-      if (iid) instanceRooms.delete(iid);
-      pinToInstance.delete(pin);
       rooms.delete(pin);
       cleanupTimers.delete(pin);
     }, 60_000);
@@ -128,21 +123,14 @@ export function getAllRooms(): RoomSummary[] {
 }
 
 // Used by Discord Activity: joins existing room or creates one keyed by instanceId.
-// instanceId is shared across all users in the same Activity session, so whoever
-// arrives first creates the room (with a normal 4-digit PIN) and everyone else joins it.
+// instanceId is shared across all users in the same Activity session, so it doubles
+// as the room key directly — no separate PIN needed.
 export function joinOrCreateRoom(instanceId: string, memberId: string, username: string, avatar?: string | null): Room {
-  const existingPin = instanceRooms.get(instanceId);
-  if (existingPin) {
-    const existing = rooms.get(existingPin);
-    if (existing) return joinRoom(existingPin, memberId, username, avatar) ?? existing;
-  }
-
-  const pin = generatePin();
-  instanceRooms.set(instanceId, pin);
-  pinToInstance.set(pin, instanceId);
+  const existing = rooms.get(instanceId);
+  if (existing) return joinRoom(instanceId, memberId, username, avatar) ?? existing;
 
   const room: Room = {
-    pin,
+    pin: instanceId,
     hostId: memberId,
     hidden: true,
     discordOnly: true,
@@ -154,7 +142,7 @@ export function joinOrCreateRoom(instanceId: string, memberId: string, username:
     playback: { playing: false, timestamp: 0, lastSyncedAt: Date.now() },
     chat: [],
   };
-  rooms.set(pin, room);
+  rooms.set(instanceId, room);
   return room;
 }
 

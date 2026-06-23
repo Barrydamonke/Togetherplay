@@ -6,6 +6,7 @@ interface Props {
   room: Room;
   membersCollapsed: boolean;
   onToggleMembersCollapsed: () => void;
+  channelName?: string | null;
 }
 
 const MEMBER_COLORS = ['#ff7a52', '#6fae8e', '#5e6fb5', '#d98b9e', '#c98a52', '#7fa6cf', '#9b6ae0', '#3fae93'];
@@ -47,12 +48,28 @@ function CopyPin({ pin }: { pin: string }) {
 
 // Renders only the PIN banner and the Watching section.
 // Queue is rendered as a direct flex sibling in Room.tsx so it and Chat can share space.
-export function Sidebar({ room, membersCollapsed, onToggleMembersCollapsed }: Props) {
+export function Sidebar({ room, membersCollapsed, onToggleMembersCollapsed, channelName }: Props) {
   return (
     <div style={{ flexShrink: 0 }}>
-      {/* PIN */}
+      {/* PIN for regular rooms; voice channel label for Discord rooms */}
       <div style={{ padding: '14px 16px 6px' }}>
-        <CopyPin pin={room.pin} />
+        {room.discordOnly ? (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', padding: '12px 14px', borderRadius: 'var(--r-md)',
+            border: '1.5px dashed var(--border)', background: 'var(--surface-2)',
+            color: 'var(--text)', boxSizing: 'border-box',
+          }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--text-faint)' }}>
+              Voice Channel
+            </span>
+            <span className="font-display" style={{ fontSize: 15, fontWeight: 600, color: 'var(--accent)', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {channelName ?? '—'}
+            </span>
+          </div>
+        ) : (
+          <CopyPin pin={room.pin} />
+        )}
       </div>
 
       {/* Watching / Members */}
