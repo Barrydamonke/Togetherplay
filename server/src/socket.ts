@@ -108,6 +108,15 @@ export function setupSocket(io: Server): void {
       io.to(currentPin).emit('playback:update', { playback: room.playback });
     });
 
+    socket.on('playback:heartbeat', ({ timestamp }: { timestamp: number }) => {
+      if (!currentPin) return;
+      const room = getRoom(currentPin);
+      if (!room || room.hostId !== socket.id) return;
+      if (!room.playback.playing) return;
+      room.playback = { ...room.playback, timestamp, lastSyncedAt: Date.now() };
+      io.to(currentPin).emit('playback:update', { playback: room.playback });
+    });
+
     socket.on('queue:add', ({ video }: { video: Video }) => {
       if (!currentPin) return;
       const room = getRoom(currentPin);

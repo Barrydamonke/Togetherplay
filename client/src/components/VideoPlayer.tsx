@@ -55,6 +55,7 @@ interface Props {
   onPause: (timestamp: number) => void;
   onSeek: (timestamp: number) => void;
   onEnded?: () => void;
+  onHeartbeat?: (timestamp: number) => void;
   showStats?: boolean;
   videoTitle?: string;
   idleGameUrl?: string;
@@ -77,7 +78,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded, showStats = false, videoTitle, idleGameUrl, sidebarHidden, onToggleSidebar }: Props) {
+export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded, onHeartbeat, showStats = false, videoTitle, idleGameUrl, sidebarHidden, onToggleSidebar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRef = useRef(false);
@@ -336,6 +337,18 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     }, 5000);
     return () => clearInterval(id);
   }, []);
+
+  // Host heartbeat: broadcast current position every 5s while playing so
+  // viewers' drift can self-correct without needing a play/pause/seek event.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!isHostRef.current) return;
+      const video = videoRef.current;
+      if (!video || video.paused) return;
+      onHeartbeat?.(video.currentTime);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [onHeartbeat]);
 
   // Update drift display every second for the sync indicator pill.
   useEffect(() => {

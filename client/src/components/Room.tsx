@@ -260,6 +260,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
                 onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
                 onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
                 onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
+                onHeartbeat={(ts) => socket.emit('playback:heartbeat', { timestamp: ts })}
                 onEnded={() => {
                   const nextIndex = room.currentVideoIndex + 1;
                   if (nextIndex < room.queue.length) {
@@ -285,6 +286,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
               onPlay={(ts) => socket.emit('playback:play', { timestamp: ts })}
               onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
               onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
+              onHeartbeat={(ts) => socket.emit('playback:heartbeat', { timestamp: ts })}
               onEnded={() => {
                 const nextIndex = room.currentVideoIndex + 1;
                 if (nextIndex < room.queue.length) {
