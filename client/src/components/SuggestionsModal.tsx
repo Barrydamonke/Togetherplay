@@ -22,6 +22,7 @@ export function SuggestionsModal({ roomPin, onClose }: Props) {
 
   async function handleSend() {
     if (!type || !message.trim()) return;
+    setErrorMsg('');
     setStatus('sending');
     try {
       const res = await fetch('/api/suggestions', {
@@ -41,7 +42,7 @@ export function SuggestionsModal({ roomPin, onClose }: Props) {
   }
 
   const selected = TYPES.find(t => t.id === type);
-  const canSend = type !== null && message.trim().length > 0 && status === 'idle';
+  const canSend = type !== null && message.trim().length > 0 && (status === 'idle' || status === 'error');
 
   return (
     <div
@@ -116,7 +117,7 @@ export function SuggestionsModal({ roomPin, onClose }: Props) {
                   return (
                     <button
                       key={t.id}
-                      onClick={() => setType(t.id)}
+                      onClick={() => { setType(t.id); if (status === 'error') setStatus('idle'); }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 14,
                         padding: '12px 16px', borderRadius: 'var(--r-md)',
@@ -156,7 +157,7 @@ export function SuggestionsModal({ roomPin, onClose }: Props) {
               </span>
               <textarea
                 value={message}
-                onChange={e => setMessage(e.target.value)}
+                onChange={e => { setMessage(e.target.value); if (status === 'error') setStatus('idle'); }}
                 placeholder={
                   type === 'media' ? 'What do you want to watch?' :
                   type === 'feature' ? 'What would you like to see added or changed?' :

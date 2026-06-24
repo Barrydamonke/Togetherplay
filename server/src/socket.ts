@@ -83,6 +83,7 @@ export function setupSocket(io: Server): void {
 
     socket.on('playback:play', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
+      if (!isFinite(timestamp) || timestamp < 0) return;
       const room = getRoom(currentPin);
       if (!room) return;
       if (room.hostId !== socket.id && !room.viewerCanControl) return;
@@ -92,6 +93,7 @@ export function setupSocket(io: Server): void {
 
     socket.on('playback:pause', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
+      if (!isFinite(timestamp) || timestamp < 0) return;
       const room = getRoom(currentPin);
       if (!room) return;
       if (room.hostId !== socket.id && !room.viewerCanControl) return;
@@ -101,6 +103,7 @@ export function setupSocket(io: Server): void {
 
     socket.on('playback:seek', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
+      if (!isFinite(timestamp) || timestamp < 0) return;
       const room = getRoom(currentPin);
       if (!room) return;
       if (room.hostId !== socket.id && !room.viewerCanControl) return;
@@ -110,6 +113,7 @@ export function setupSocket(io: Server): void {
 
     socket.on('playback:heartbeat', ({ timestamp }: { timestamp: number }) => {
       if (!currentPin) return;
+      if (!isFinite(timestamp) || timestamp < 0) return;
       const room = getRoom(currentPin);
       if (!room || room.hostId !== socket.id) return;
       if (!room.playback.playing) return;

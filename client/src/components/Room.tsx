@@ -261,6 +261,25 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
                 onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
                 onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
                 onHeartbeat={(ts) => socket.emit('playback:heartbeat', { timestamp: ts })}
+                onRequestSubtitles={async () => {
+                  const res = await fetch('/api/suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      type: 'subtitles',
+                      message: currentVideo?.title ? `Subtitles requested for: ${currentVideo.title}` : 'Subtitles requested',
+                      roomPin: room.pin,
+                      mediaId: currentVideo?.jellyfinId,
+                    }),
+                  });
+                  if (!res.ok) {
+                    if (res.status === 503) addToast("Subtitles can't be requested — no webhook has been set up.");
+                    else addToast("Couldn't send the subtitle request — please try again.");
+                    throw new Error(`status ${res.status}`);
+                  }
+                  const body = await res.json() as { ok: boolean; alreadyRequested?: boolean };
+                  addToast(body.alreadyRequested ? 'Subtitles already requested!' : 'Subtitles have been requested!');
+                }}
                 onEnded={() => {
                   const nextIndex = room.currentVideoIndex + 1;
                   if (nextIndex < room.queue.length) {
@@ -287,6 +306,23 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
               onPause={(ts) => socket.emit('playback:pause', { timestamp: ts })}
               onSeek={(ts) => socket.emit('playback:seek', { timestamp: ts })}
               onHeartbeat={(ts) => socket.emit('playback:heartbeat', { timestamp: ts })}
+              onRequestSubtitles={async () => {
+                const res = await fetch('/api/suggestions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'subtitles',
+                    message: currentVideo?.title ? `Subtitles requested for: ${currentVideo.title}` : 'Subtitles requested',
+                    roomPin: room.pin,
+                    mediaId: currentVideo?.jellyfinId,
+                  }),
+                });
+                if (res.status === 503) {
+                  addToast("Subtitles can't be requested — no webhook has been set up.");
+                  throw new Error('not configured');
+                }
+                addToast('Subtitles have been requested!');
+              }}
               onEnded={() => {
                 const nextIndex = room.currentVideoIndex + 1;
                 if (nextIndex < room.queue.length) {

@@ -9,7 +9,7 @@ import { useIsMobile } from '../lib/useIsMobile';
 import { useToasts, ToastContainer } from './Toast';
 import { useRateLimit } from '../lib/useRateLimit';
 
-const APP_VERSION = '1.4.9';
+const APP_VERSION = '1.4.10';
 
 interface Props {
   theme: 'dark' | 'light';

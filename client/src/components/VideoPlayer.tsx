@@ -56,6 +56,7 @@ interface Props {
   onSeek: (timestamp: number) => void;
   onEnded?: () => void;
   onHeartbeat?: (timestamp: number) => void;
+  onRequestSubtitles?: () => Promise<void>;
   showStats?: boolean;
   videoTitle?: string;
   idleGameUrl?: string;
@@ -78,7 +79,7 @@ function formatTime(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded, onHeartbeat, showStats = false, videoTitle, idleGameUrl, sidebarHidden, onToggleSidebar }: Props) {
+export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId, playback, isHost, canControl, onPlay, onPause, onSeek, onEnded, onHeartbeat, onRequestSubtitles, showStats = false, videoTitle, idleGameUrl, sidebarHidden, onToggleSidebar }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const syncingRef = useRef(false);
@@ -100,7 +101,10 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const [liveStats, setLiveStats] = useState({ bufferAhead: 0, bandwidth: 0, droppedFrames: 0 });
 
   const [subtitleTracks, setSubtitleTracks] = useState<SubtitleTrack[]>([]);
+  const [subtitleTracksLoaded, setSubtitleTracksLoaded] = useState(false);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
+  const [subtitleLoading, setSubtitleLoading] = useState(false);
+  const [subtitleRequestState, setSubtitleRequestState] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [subtitleCues, setSubtitleCues] = useState<Cue[]>([]);
   const [activeCue, setActiveCue] = useState('');
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
@@ -114,33 +118,50 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const playbackRef = useRef(playback);
   const isHostRef = useRef(isHost);
   const onEndedRef = useRef(onEnded);
+  const onHeartbeatRef = useRef(onHeartbeat);
   useEffect(() => { playbackRef.current = playback; }, [playback]);
   useEffect(() => { isHostRef.current = isHost; }, [isHost]);
   useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
+  useEffect(() => { onHeartbeatRef.current = onHeartbeat; }, [onHeartbeat]);
   useEffect(() => { subtitleCuesRef.current = subtitleCues; }, [subtitleCues]);
 
   // Fetch available subtitle tracks when the Jellyfin item changes.
   useEffect(() => {
     setSubtitleTracks([]);
+    setSubtitleTracksLoaded(false);
+    setSubtitleRequestState('idle');
     setSelectedTrackIndex(null);
     setSubtitleCues([]);
     setActiveCue('');
     if (!jellyfinId) return;
     fetch(`/api/jellyfin/subtitle-tracks/${jellyfinId}`)
       .then((r) => r.json())
-      .then((data: { tracks: SubtitleTrack[] }) => setSubtitleTracks(data.tracks))
-      .catch(() => {});
+      .then((data: { tracks: SubtitleTrack[] }) => {
+        setSubtitleTracks(data.tracks);
+        setSubtitleTracksLoaded(true);
+      })
+      .catch(() => setSubtitleTracksLoaded(true));
   }, [jellyfinId]);
 
   // Fetch and parse VTT when the user selects a track.
   useEffect(() => {
     setSubtitleCues([]);
     setActiveCue('');
-    if (selectedTrackIndex === null || !jellyfinId) return;
+    if (selectedTrackIndex === null || !jellyfinId) {
+      setSubtitleLoading(false);
+      return;
+    }
+    setSubtitleLoading(true);
     fetch(`/api/jellyfin/subtitles/${jellyfinId}/${selectedTrackIndex}`)
       .then((r) => r.text())
-      .then((text) => setSubtitleCues(parseVtt(text)))
-      .catch(() => {});
+      .then((text) => {
+        setSubtitleCues(parseVtt(text));
+        setSubtitleLoading(false);
+      })
+      .catch(() => {
+        setSelectedTrackIndex(null);
+        setSubtitleLoading(false);
+      });
   }, [selectedTrackIndex, jellyfinId]);
 
   // Fetch Jellyfin codec/format metadata for the stats overlay and startup log.
@@ -345,10 +366,10 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       if (!isHostRef.current) return;
       const video = videoRef.current;
       if (!video || video.paused) return;
-      onHeartbeat?.(video.currentTime);
+      onHeartbeatRef.current?.(video.currentTime);
     }, 5000);
     return () => clearInterval(id);
-  }, [onHeartbeat]);
+  }, []);
 
   // Update drift display every second for the sync indicator pill.
   useEffect(() => {
@@ -637,6 +658,37 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
             </span>
           )}
 
+          {/* Subtitle request button — shown when track list is loaded but empty */}
+          {jellyfinId && subtitleTracksLoaded && subtitleTracks.length === 0 && (
+            <button
+              onClick={() => {
+                if (subtitleRequestState !== 'idle') return;
+                setSubtitleRequestState('loading');
+                onRequestSubtitles?.()
+                  .then(() => {
+                    setSubtitleRequestState('sent');
+                    setTimeout(() => setSubtitleRequestState('idle'), 2500);
+                  })
+                  .catch(() => {
+                    setSubtitleRequestState('error');
+                    setTimeout(() => setSubtitleRequestState('idle'), 5000);
+                  });
+              }}
+              title={subtitleRequestState === 'sent' ? 'Subtitles requested!' : 'Request subtitles'}
+              style={{
+                background: subtitleRequestState === 'sent' ? 'var(--online)' : subtitleRequestState === 'error' ? 'rgba(237,66,69,.35)' : 'none',
+                border: subtitleRequestState === 'sent' || subtitleRequestState === 'error' ? 'none' : '1px dashed rgba(255,255,255,.4)',
+                color: '#fff', padding: '4px 8px', borderRadius: 6,
+                fontWeight: 800, fontSize: 11, letterSpacing: '.06em',
+                cursor: subtitleRequestState === 'idle' ? 'pointer' : 'default',
+                lineHeight: 1, flexShrink: 0, transition: 'background .2s, border .2s',
+                opacity: subtitleRequestState === 'loading' ? 0.5 : 1,
+              }}
+            >
+              {subtitleRequestState === 'sent' ? '✓ CC' : subtitleRequestState === 'loading' ? '…' : subtitleRequestState === 'error' ? '✕ CC' : 'CC ?'}
+            </button>
+          )}
+
           {/* Subtitle track selector */}
           {subtitleTracks.length > 0 && (
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -644,14 +696,16 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
                 onClick={() => setShowSubtitleMenu((s) => !s)}
                 title="Subtitles"
                 style={{
-                  background: selectedTrackIndex !== null ? 'var(--accent)' : 'rgba(255,255,255,.15)',
+                  background: selectedTrackIndex !== null && !subtitleLoading ? 'var(--accent)' : 'rgba(255,255,255,.15)',
                   border: 'none', color: '#fff',
                   padding: '4px 8px', borderRadius: 6,
                   fontWeight: 800, fontSize: 11, letterSpacing: '.06em',
                   cursor: 'pointer', lineHeight: 1,
+                  opacity: subtitleLoading ? 0.5 : 1,
+                  transition: 'background .2s, opacity .2s',
                 }}
               >
-                CC
+                {subtitleLoading ? '…' : 'CC'}
               </button>
               {showSubtitleMenu && (
                 <div style={{
@@ -810,6 +864,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
                 ? Math.max(0, Math.min(expected, video.duration))
                 : Math.max(0, expected);
               video.currentTime = clamped;
+              if (pb.playing && video.paused) video.play().catch(() => {});
             } : undefined}
             style={{
               position: 'absolute', top: 16, left: 16,
