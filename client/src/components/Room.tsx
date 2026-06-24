@@ -246,7 +246,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
             }}>
               <VideoPlayer
                 streamUrl={currentVideo?.streamUrl ?? null}
-                isHls={currentVideo?.isHls ?? true}
+                isHls={currentVideo?.isHls ?? false}
                 knownDuration={currentVideo?.duration}
                 jellyfinId={currentVideo?.jellyfinId}
                 videoTitle={currentVideo?.title}
@@ -291,7 +291,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
           ) : (
             <VideoPlayer
               streamUrl={currentVideo?.streamUrl ?? null}
-              isHls={currentVideo?.isHls ?? true}
+              isHls={currentVideo?.isHls ?? false}
               knownDuration={currentVideo?.duration}
               jellyfinId={currentVideo?.jellyfinId}
               videoTitle={currentVideo?.title}

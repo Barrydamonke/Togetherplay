@@ -416,7 +416,7 @@ export function JellyfinBrowser({ onAdd, onClose, username }: Props) {
               />
               {ytStatus === 'fetching' && (
                 <div style={{
-                  position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)',
+                  position: 'absolute', right: 13, top: 'calc(50% - 7.5px)',
                   width: 15, height: 15, borderRadius: '50%',
                   border: '2px solid var(--border)', borderTopColor: 'var(--accent)',
                   animation: 'yt-spin 0.7s linear infinite',
