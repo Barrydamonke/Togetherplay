@@ -27,7 +27,7 @@ function load(): AppConfig {
     githubRepoUrl: 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: '',
     suggestionWebhookUrl: '',
-    ytdlpPath: '/usr/local/bin/yt-dlp',
+    ytdlpPath: '/usr/bin/yt-dlp',
     ytdlpDownloadDir: '/downloads',
     ytdlpDefaultArgs: "-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4",
     ytdlpApprovalRequired: false,

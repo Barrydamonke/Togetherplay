@@ -48,7 +48,7 @@ router.post('/config', (req: Request, res: Response) => {
     githubRepoUrl: githubRepoUrl || 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: landingMessage ?? '',
     suggestionWebhookUrl: suggestionWebhookUrl ?? '',
-    ytdlpPath: ytdlpPath ?? '/usr/local/bin/yt-dlp',
+    ytdlpPath: ytdlpPath ?? '/usr/bin/yt-dlp',
     ytdlpDownloadDir: ytdlpDownloadDir ?? '/downloads',
     ytdlpDefaultArgs: ytdlpDefaultArgs ?? "-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4",
     ytdlpApprovalRequired: ytdlpApprovalRequired ?? false,
