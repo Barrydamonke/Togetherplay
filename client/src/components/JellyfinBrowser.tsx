@@ -173,7 +173,22 @@ export function JellyfinBrowser({ onAdd, onClose, username }: Props) {
       }
       const { id, status: initialStatus } = await res.json() as { id: string; status: string };
       setYtDownloadId(id);
-      setYtStatus(initialStatus === 'pending_approval' ? 'pending_approval' : 'downloading');
+      if (initialStatus === 'ready') {
+        setYtStatus('done');
+        onAdd({
+          id,
+          title: ytMeta.title,
+          source: 'youtube',
+          streamUrl: `/api/youtube/file/${id}`,
+          thumbnailUrl: ytMeta.thumbnailUrl || undefined,
+          duration: ytMeta.duration || undefined,
+          ytDownloadId: id,
+        });
+      } else if (initialStatus === 'pending_approval') {
+        setYtStatus('pending_approval');
+      } else {
+        setYtStatus('downloading');
+      }
     } catch (err) {
       setYtError(String(err));
       setYtStatus('error');

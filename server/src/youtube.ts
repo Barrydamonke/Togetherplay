@@ -166,6 +166,21 @@ export function createDownload(
   estimatedSizeMb: number,
   requestedBy: string,
 ): YTDownload {
+  // Return an existing download for this URL if it's already ready or in progress
+  for (const d of downloads.values()) {
+    if (d.url !== url) continue;
+    if (d.status === 'ready' && d.filename) {
+      const { ytdlpDownloadDir } = getConfig();
+      if (existsSync(join(ytdlpDownloadDir, d.filename))) {
+        d.lastPlayedAt = Date.now();
+        persist();
+        return d;
+      }
+    } else if (d.status === 'downloading' || d.status === 'pending_approval') {
+      return d;
+    }
+  }
+
   const id = randomUUID();
   const { ytdlpApprovalRequired } = getConfig();
   const download: YTDownload = {
