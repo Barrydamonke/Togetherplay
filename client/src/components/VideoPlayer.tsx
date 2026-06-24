@@ -110,6 +110,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
   const subtitleCuesRef = useRef<Cue[]>([]);
   const [syncDrift, setSyncDrift] = useState(0); // seconds: negative = behind host, positive = ahead
+  const [reconnectMsg, setReconnectMsg] = useState('');
 
   const isMobile = useIsMobile();
   const nativeHeight = isMobile && !isFullscreen;
@@ -250,6 +251,9 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     setStreamError('');
     setNeedsGesture(false);
     setIsBuffering(true);
+    setReconnectMsg('');
+    setDuration(knownDuration ?? 0);
+    setCurrentTime(0);
     setLiveStats({ bufferAhead: 0, bandwidth: 0, droppedFrames: 0 });
     hlsRef.current?.destroy();
     hlsRef.current = null;
@@ -257,18 +261,62 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
 
     if (isHls) {
       if (Hls.isSupported()) {
-        const hls = new Hls();
+        const hls = new Hls({
+          // Build a large buffer so brief network blips don't cause stalls or quality drops.
+          maxBufferLength: 60,
+          maxMaxBufferLength: 120,
+          // Conservative ABR: prefer a short stall over quality thrashing.
+          // A watch party is worse with constant quality switches than with a brief pause.
+          abrBandWidthFactor: 0.75,
+          abrBandWidthUpFactor: 0.55,
+          // Slow down how fast ABR reacts to bandwidth changes (default 3/9).
+          abrEwmaFastVoD: 5,
+          abrEwmaSlowVoD: 15,
+          // Retry failed segments more aggressively before giving up.
+          fragLoadingMaxRetry: 6,
+          fragLoadingRetryDelay: 1000,
+          manifestLoadingMaxRetry: 3,
+          levelLoadingMaxRetry: 4,
+        });
         hlsRef.current = hls;
+        let mediaErrorRecovered = false;
+        let networkRecoveries = 0;
+        const MAX_NETWORK_RECOVERIES = 3;
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (data.fatal) {
-            const status = (data as any).response?.code ? ` — HTTP ${(data as any).response.code}` : '';
-            console.error('HLS fatal error', data);
-            setStreamError(`HLS error (${data.details}): ${data.type}${status}`);
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              if (networkRecoveries < MAX_NETWORK_RECOVERIES) {
+                networkRecoveries++;
+                console.warn(`HLS network error — recovery ${networkRecoveries}/${MAX_NETWORK_RECOVERIES}`, data.details);
+                setReconnectMsg(`Reconnecting… (${networkRecoveries}/${MAX_NETWORK_RECOVERIES})`);
+                hls.startLoad();
+              } else {
+                const status = (data as any).response?.code ? ` — HTTP ${(data as any).response.code}` : '';
+                console.error('HLS network error — giving up after max retries', data);
+                setStreamError(`Stream unavailable — check your network connection.${status}`);
+              }
+            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !mediaErrorRecovered) {
+              console.warn('HLS fatal media error — attempting recovery', data.details);
+              mediaErrorRecovered = true;
+              hls.recoverMediaError();
+            } else {
+              const status = (data as any).response?.code ? ` — HTTP ${(data as any).response.code}` : '';
+              console.error('HLS fatal error (unrecoverable)', data);
+              setStreamError(`HLS error (${data.details}): ${data.type}${status}`);
+            }
           } else {
-            const code = (data as any).response?.code;
-            const url = (data as any).response?.url ?? (data as any).url ?? '';
-            console.warn(`HLS non-fatal: ${data.details}`, code ?? '', url);
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+              setReconnectMsg('Reconnecting…');
+            } else {
+              const code = (data as any).response?.code;
+              const url = (data as any).response?.url ?? (data as any).url ?? '';
+              console.warn(`HLS non-fatal: ${data.details}`, code ?? '', url);
+            }
           }
+        });
+        hls.on(Hls.Events.FRAG_LOADED, () => {
+          networkRecoveries = 0;
+          setReconnectMsg('');
         });
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
@@ -293,6 +341,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     if (!video) return;
 
     const sync = async () => {
+      if (syncingRef.current) return;
       syncingRef.current = true;
       try {
         const rawTarget = playback.playing
@@ -346,6 +395,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       if (isHostRef.current) return;
       const video = videoRef.current;
       if (!video || !playbackRef.current.playing) return;
+      if (video.readyState < 3) return; // don't seek while buffering — it evicts the partial buffer
       const rawExpected =
         playbackRef.current.timestamp +
         (Date.now() - playbackRef.current.lastSyncedAt) / 1000;
@@ -365,7 +415,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
     const id = setInterval(() => {
       if (!isHostRef.current) return;
       const video = videoRef.current;
-      if (!video || video.paused) return;
+      if (!video || video.paused || video.readyState < 3) return; // don't broadcast a stalled position
       onHeartbeatRef.current?.(video.currentTime);
     }, 5000);
     return () => clearInterval(id);
@@ -379,9 +429,12 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
         setSyncDrift(0);
         return;
       }
-      const expected =
+      const rawExpected =
         playbackRef.current.timestamp +
         (Date.now() - playbackRef.current.lastSyncedAt) / 1000;
+      const expected = isFinite(video.duration) && video.duration > 0
+        ? Math.max(0, Math.min(rawExpected, video.duration))
+        : Math.max(0, rawExpected);
       setSyncDrift(video.currentTime - expected);
     }, 1000);
     return () => clearInterval(id);
@@ -410,7 +463,12 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       setIsBuffering(false);
       // Retry play if the sync effect fired before the stream was ready.
       if (playbackRef.current.playing && video.paused) {
-        video.play().catch(() => {});
+        video.play().catch((err: unknown) => {
+          if ((err as Error).name === 'NotAllowedError') {
+            setNeedsGesture(true);
+            setControlsVisible(true);
+          }
+        });
       }
     };
     const onWaiting = () => setIsBuffering(true);
@@ -832,12 +890,17 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
       {isBuffering && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          pointerEvents: 'none',
+          pointerEvents: 'none', flexDirection: 'column', gap: 12,
         }}>
           <svg width="52" height="52" viewBox="0 0 52 52" fill="none" style={{ animation: 'spin 0.75s linear infinite' }}>
             <circle cx="26" cy="26" r="22" stroke="rgba(255,255,255,0.18)" strokeWidth="4" />
             <path d="M48 26a22 22 0 0 0-22-22" stroke="white" strokeWidth="4" strokeLinecap="round" />
           </svg>
+          {reconnectMsg && (
+            <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 600, textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+              {reconnectMsg}
+            </div>
+          )}
         </div>
       )}
 
