@@ -37,12 +37,22 @@ router.get('/config', (req: Request, res: Response) => {
 
 router.post('/config', (req: Request, res: Response) => {
   if (!checkAuth(req, res)) return;
-  const { jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl, githubRepoUrl, landingMessage, suggestionWebhookUrl } = req.body as AppConfig;
+  const {
+    jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl,
+    githubRepoUrl, landingMessage, suggestionWebhookUrl,
+    ytdlpPath, ytdlpDownloadDir, ytdlpDefaultArgs,
+    ytdlpApprovalRequired, ytdlpApprovalWebhookUrl,
+  } = req.body as AppConfig;
   saveConfig({
     jellyfinUrl, jellyfinApiKey, jellyfinUserId, uploadServiceUrl,
     githubRepoUrl: githubRepoUrl || 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage: landingMessage ?? '',
     suggestionWebhookUrl: suggestionWebhookUrl ?? '',
+    ytdlpPath: ytdlpPath ?? '/usr/local/bin/yt-dlp',
+    ytdlpDownloadDir: ytdlpDownloadDir ?? '/downloads',
+    ytdlpDefaultArgs: ytdlpDefaultArgs ?? "-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4",
+    ytdlpApprovalRequired: ytdlpApprovalRequired ?? false,
+    ytdlpApprovalWebhookUrl: ytdlpApprovalWebhookUrl ?? '',
   });
   res.json({ ok: true });
 });

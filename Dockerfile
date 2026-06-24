@@ -27,6 +27,10 @@ RUN npm ci --omit=dev
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
+# Install yt-dlp and ffmpeg (ffmpeg is required by yt-dlp to merge video+audio streams)
+RUN apk add --no-cache python3 py3-pip ffmpeg && \
+    pip3 install --no-cache-dir --break-system-packages yt-dlp
+
 COPY --from=server-build /build/dist    ./server/dist
 COPY --from=server-deps  /build/node_modules ./server/node_modules
 COPY --from=client-build /build/dist    ./client/dist

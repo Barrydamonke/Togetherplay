@@ -616,6 +616,7 @@ export function Room({ initialRoom, memberId, theme, onToggleTheme, onLeave, cha
 
       {showBrowser && (
         <JellyfinBrowser
+          username={room.members.find((m) => m.id === memberId)?.username ?? 'anonymous'}
           onAdd={(video) => {
             if (checkRateLimit('queueAdd')) socket.emit('queue:add', { video });
             setShowBrowser(false);

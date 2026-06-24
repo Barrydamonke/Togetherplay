@@ -14,6 +14,11 @@ interface Config {
   githubRepoUrl: string;
   landingMessage: string;
   suggestionWebhookUrl: string;
+  ytdlpPath: string;
+  ytdlpDownloadDir: string;
+  ytdlpDefaultArgs: string;
+  ytdlpApprovalRequired: boolean;
+  ytdlpApprovalWebhookUrl: string;
 }
 
 const inputStyle: CSSProperties = {
@@ -112,6 +117,9 @@ export function AdminPanel({ onClose }: Props) {
   const [config, setConfig] = useState<Config>({
     jellyfinUrl: '', jellyfinApiKey: '', jellyfinUserId: '', uploadServiceUrl: '',
     githubRepoUrl: '', landingMessage: '', suggestionWebhookUrl: '',
+    ytdlpPath: '/usr/local/bin/yt-dlp', ytdlpDownloadDir: '/downloads',
+    ytdlpDefaultArgs: "-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4",
+    ytdlpApprovalRequired: false, ytdlpApprovalWebhookUrl: '',
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const updateCheck = useUpdateCheck(config.githubRepoUrl);
@@ -168,6 +176,10 @@ export function AdminPanel({ onClose }: Props) {
 
   function patch(key: keyof Config) {
     return (v: string) => setConfig((c) => ({ ...c, [key]: v }));
+  }
+
+  function patchBool(key: keyof Config) {
+    return (v: boolean) => setConfig((c) => ({ ...c, [key]: v }));
   }
 
   return (
@@ -444,6 +456,122 @@ export function AdminPanel({ onClose }: Props) {
                   }}
                 />
               </label>
+            </section>
+
+            {/* yt-dlp section */}
+            <section>
+              <SectionHead label="yt-dlp (YouTube Downloads)" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* License notice */}
+                <div style={{
+                  fontSize: 12, color: 'var(--text-faint)', lineHeight: 1.6,
+                  padding: '9px 13px', borderRadius: 8, background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                }}>
+                  yt-dlp is released under{' '}
+                  <a href="https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                    The Unlicense
+                  </a>{' '}
+                  (public domain). ffmpeg is licensed under{' '}
+                  <a href="https://ffmpeg.org/legal.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                    LGPL 2.1+
+                  </a>.
+                </div>
+
+                {/* Binary path */}
+                <label style={{ display: 'block' }}>
+                  <span style={labelStyle}>yt-dlp binary path</span>
+                  <input
+                    type="text"
+                    value={config.ytdlpPath}
+                    onChange={(e) => patch('ytdlpPath')(e.target.value)}
+                    placeholder="/usr/local/bin/yt-dlp"
+                    spellCheck={false}
+                    style={{ ...inputStyle, fontFamily: 'monospace' }}
+                  />
+                  {!config.ytdlpPath && (
+                    <a
+                      href="https://github.com/yt-dlp/yt-dlp"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        marginTop: 6, fontSize: 12, fontWeight: 700, color: 'var(--accent)',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Get yt-dlp ↗
+                    </a>
+                  )}
+                </label>
+
+                {/* Download directory */}
+                <Field
+                  label="Download directory (server path)"
+                  value={config.ytdlpDownloadDir}
+                  onChange={patch('ytdlpDownloadDir')}
+                  placeholder="/downloads"
+                  mono
+                />
+
+                {/* Default command args */}
+                <label style={{ display: 'block' }}>
+                  <span style={labelStyle}>Default download arguments</span>
+                  <textarea
+                    value={config.ytdlpDefaultArgs}
+                    onChange={(e) => patch('ytdlpDefaultArgs')(e.target.value)}
+                    placeholder="-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4"
+                    rows={3}
+                    spellCheck={false}
+                    style={{
+                      ...inputStyle,
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      resize: 'vertical',
+                      lineHeight: 1.6,
+                      minHeight: 72,
+                    }}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4, display: 'block' }}>
+                    The URL and output path are appended automatically. Do not include --output or the URL here.
+                  </span>
+                </label>
+
+                {/* Approval toggle */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <div
+                    onClick={() => patchBool('ytdlpApprovalRequired')(!config.ytdlpApprovalRequired)}
+                    style={{
+                      width: 36, height: 20, borderRadius: 99, flexShrink: 0,
+                      background: config.ytdlpApprovalRequired ? 'var(--accent)' : 'var(--surface-3)',
+                      border: '1.5px solid var(--border)', position: 'relative', cursor: 'pointer',
+                      transition: 'background .15s',
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute', top: 2,
+                      left: config.ytdlpApprovalRequired ? 18 : 2,
+                      width: 12, height: 12, borderRadius: '50%',
+                      background: config.ytdlpApprovalRequired ? 'var(--accent-ink)' : 'var(--text-faint)',
+                      transition: 'left .15s',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                    Require Discord approval before downloading
+                  </span>
+                </label>
+
+                {/* Approval webhook URL — only shown when approval enabled */}
+                {config.ytdlpApprovalRequired && (
+                  <Field
+                    label="Approval webhook URL"
+                    value={config.ytdlpApprovalWebhookUrl}
+                    onChange={patch('ytdlpApprovalWebhookUrl')}
+                    placeholder="https://discord.com/api/webhooks/…"
+                  />
+                )}
+              </div>
             </section>
 
             {/* Save */}

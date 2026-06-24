@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { randomUUID } from 'crypto';
 import { createRoom, getRoom, joinRoom, joinOrCreateRoom, leaveRoom, getCurrentTimestamp, getOnlineStats, updateRoomSettings, renameMember } from './rooms';
 import { Video, ChatMessage } from './types';
+import { updateLastPlayed } from './youtube';
 
 function emitSystemMessage(io: Server, pin: string, text: string): void {
   const message: ChatMessage = {
@@ -185,6 +186,9 @@ export function setupSocket(io: Server): void {
           : '';
         const mode = video.isHls ? 'HLS' : 'Direct Stream';
         console.log(`▶ "${video.title}" started playing in room ${currentPin} [${video.source} · ${mode}${dur}]`);
+        if (video.source === 'youtube' && video.ytDownloadId) {
+          updateLastPlayed(video.ytDownloadId);
+        }
       }
     });
 

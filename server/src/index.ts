@@ -9,7 +9,9 @@ import adminRouter from './routes/admin';
 import roomsRouter from './routes/rooms';
 import discordRouter from './routes/discord';
 import suggestionsRouter from './routes/suggestions';
+import youtubeRouter from './routes/youtube';
 import { getConfig } from './config';
+import { initDownloadManager } from './youtube';
 
 const app = express();
 const httpServer = createServer(app);
@@ -24,6 +26,7 @@ app.use('/api/jellyfin', jellyfinRouter);
 app.use('/api/rooms', roomsRouter);
 app.use('/api/discord', discordRouter);
 app.use('/api/suggestions', suggestionsRouter);
+app.use('/api/youtube', youtubeRouter);
 app.use('/admin', adminRouter);
 
 app.get('/api/landing-message', (_req, res) => {
@@ -37,6 +40,7 @@ app.get('*', (_req, res) => {
 });
 
 setupSocket(io);
+initDownloadManager(io);
 
 const PORT = process.env.PORT ?? 3000;
 httpServer.listen(PORT, () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 function generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -21,10 +21,33 @@ import {
 import { getFavourites, Favourite } from '../lib/favourites';
 import { Video } from '../types';
 import { Icon } from './Icon';
+import { getSocket } from '../lib/socket';
 
 interface Props {
   onAdd: (video: Video) => void;
   onClose: () => void;
+  username?: string;
+}
+
+interface YTMeta {
+  title: string;
+  thumbnailUrl: string;
+  duration: number;
+  estimatedSizeMb: number;
+}
+
+type YTStatus = 'idle' | 'fetching' | 'ready' | 'pending_approval' | 'downloading' | 'done' | 'error' | 'denied';
+
+function isYouTubeUrl(str: string): boolean {
+  return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(str.trim());
+}
+
+function ytFormatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 interface BreadcrumbEntry {
@@ -39,7 +62,10 @@ function thumbGradient(name: string) {
   return `linear-gradient(150deg, ${THUMB_COLORS[h % THUMB_COLORS.length]}, #1a1a2e)`;
 }
 
-export function JellyfinBrowser({ onAdd, onClose }: Props) {
+export function JellyfinBrowser({ onAdd, onClose, username }: Props) {
+  const [tab, setTab] = useState<'library' | 'youtube'>('library');
+
+  // Library state
   const [items, setItems] = useState<JellyfinItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -51,6 +77,108 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
   const [jellyfinStatus, setJellyfinStatus] = useState<'ok' | 'unreachable' | 'not_configured' | null>(null);
   const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
   const [favourites] = useState<Favourite[]>(() => getFavourites());
+
+  // YouTube state
+  const [ytUrl, setYtUrl] = useState('');
+  const [ytMeta, setYtMeta] = useState<YTMeta | null>(null);
+  const [ytStatus, setYtStatus] = useState<YTStatus>('idle');
+  const [ytError, setYtError] = useState('');
+  const [ytDownloadId, setYtDownloadId] = useState<string | null>(null);
+  const ytFetchAbortRef = useRef<AbortController | null>(null);
+
+  // Socket: listen for yt-dlp status updates
+  useEffect(() => {
+    if (!ytDownloadId) return;
+    const socket = getSocket();
+    const handler = ({ id, status: s, error: e }: { id: string; status: string; error?: string }) => {
+      if (id !== ytDownloadId) return;
+      if (s === 'ready') {
+        setYtStatus('done');
+        if (ytMeta) {
+          const video: Video = {
+            id: ytDownloadId,
+            title: ytMeta.title,
+            source: 'youtube',
+            streamUrl: `/api/youtube/file/${ytDownloadId}`,
+            thumbnailUrl: ytMeta.thumbnailUrl || undefined,
+            duration: ytMeta.duration || undefined,
+            ytDownloadId,
+          };
+          onAdd(video);
+        }
+      } else if (s === 'downloading') {
+        setYtStatus('downloading');
+      } else if (s === 'error') {
+        setYtStatus('error');
+        setYtError(e ?? 'Download failed. Check the server logs.');
+      } else if (s === 'denied') {
+        setYtStatus('denied');
+      }
+    };
+    socket.on('youtube:status_update', handler);
+    return () => { socket.off('youtube:status_update', handler); };
+  }, [ytDownloadId, ytMeta, onAdd]);
+
+  const fetchYtMeta = useCallback(async (targetUrl: string) => {
+    if (ytFetchAbortRef.current) ytFetchAbortRef.current.abort();
+    const controller = new AbortController();
+    ytFetchAbortRef.current = controller;
+    setYtStatus('fetching');
+    setYtMeta(null);
+    setYtError('');
+    try {
+      const res = await fetch(`/api/youtube/info?url=${encodeURIComponent(targetUrl)}`, { signal: controller.signal });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json() as YTMeta;
+      setYtMeta(data);
+      setYtStatus('ready');
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setYtError(String(err));
+      setYtStatus('error');
+    }
+  }, []);
+
+  function handleYtUrlChange(value: string) {
+    setYtUrl(value);
+    setYtMeta(null);
+    setYtError('');
+    setYtStatus('idle');
+    if (isYouTubeUrl(value)) fetchYtMeta(value);
+  }
+
+  async function handleYtDownload() {
+    if (!ytMeta || !ytUrl) return;
+    setYtStatus('downloading');
+    setYtError('');
+    try {
+      const res = await fetch('/api/youtube/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: ytUrl,
+          title: ytMeta.title,
+          thumbnailUrl: ytMeta.thumbnailUrl,
+          duration: ytMeta.duration,
+          estimatedSizeMb: ytMeta.estimatedSizeMb,
+          requestedBy: username ?? 'anonymous',
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json() as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const { id, status: initialStatus } = await res.json() as { id: string; status: string };
+      setYtDownloadId(id);
+      setYtStatus(initialStatus === 'pending_approval' ? 'pending_approval' : 'downloading');
+    } catch (err) {
+      setYtError(String(err));
+      setYtStatus('error');
+    }
+  }
 
   useEffect(() => {
     fetch('/api/jellyfin/health')
@@ -202,7 +330,38 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
           </button>
         </div>
 
-        {/* Search */}
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: 6, padding: '0 20px 14px' }}>
+          <button
+            onClick={() => setTab('library')}
+            style={{
+              flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: tab === 'library' ? 'var(--accent-soft)' : 'var(--surface-2)',
+              color: tab === 'library' ? 'var(--accent)' : 'var(--text-dim)',
+              fontWeight: 800, fontSize: 13,
+            }}
+          >
+            Library
+          </button>
+          <button
+            onClick={() => setTab('youtube')}
+            style={{
+              flex: 1, padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: tab === 'youtube' ? 'rgba(255,68,68,0.12)' : 'var(--surface-2)',
+              color: tab === 'youtube' ? '#ff4444' : 'var(--text-dim)',
+              fontWeight: 800, fontSize: 13,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+            YouTube
+          </button>
+        </div>
+
+        {/* Search — library tab only */}
+        {tab === 'library' && (
         <div style={{ padding: '0 20px 14px' }}>
           <form onSubmit={(e) => e.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 14px', borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)', background: 'var(--surface-2)' }}>
             <Icon name="search" size={17} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
@@ -214,9 +373,10 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
             />
           </form>
         </div>
+        )}
 
-        {/* Jellyfin status pill */}
-        {jellyfinStatus && jellyfinStatus !== 'ok' && (
+        {/* Jellyfin status pill — library tab only */}
+        {tab === 'library' && jellyfinStatus && jellyfinStatus !== 'ok' && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             margin: '0 20px 12px',
@@ -233,7 +393,124 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
           </div>
         )}
 
-        {/* Items */}
+        {/* YouTube tab content */}
+        {tab === 'youtube' && (
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* URL input */}
+            <div style={{ position: 'relative' }}>
+              <input
+                type="url"
+                value={ytUrl}
+                onChange={(e) => handleYtUrlChange(e.target.value)}
+                placeholder="Search or paste YouTube URL"
+                autoFocus
+                spellCheck={false}
+                disabled={ytStatus === 'downloading' || ytStatus === 'pending_approval' || ytStatus === 'done'}
+                style={{
+                  width: '100%', padding: '11px 40px 11px 13px', borderRadius: 10,
+                  border: '1.5px solid var(--border)', background: 'var(--surface-2)',
+                  color: 'var(--text)', fontSize: 14, fontWeight: 600, outline: 'none',
+                  fontFamily: 'inherit', boxSizing: 'border-box',
+                  opacity: (ytStatus === 'downloading' || ytStatus === 'pending_approval' || ytStatus === 'done') ? 0.6 : 1,
+                }}
+              />
+              {ytStatus === 'fetching' && (
+                <div style={{
+                  position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)',
+                  width: 15, height: 15, borderRadius: '50%',
+                  border: '2px solid var(--border)', borderTopColor: 'var(--accent)',
+                  animation: 'yt-spin 0.7s linear infinite',
+                }} />
+              )}
+            </div>
+
+            {/* Metadata card */}
+            {ytMeta && (ytStatus === 'ready' || ytStatus === 'downloading' || ytStatus === 'pending_approval' || ytStatus === 'done') && (
+              <div style={{
+                display: 'flex', gap: 14, padding: 14, borderRadius: 12,
+                background: 'var(--surface-2)', border: '1px solid var(--border)',
+              }}>
+                {ytMeta.thumbnailUrl && (
+                  <img
+                    src={ytMeta.thumbnailUrl}
+                    alt=""
+                    style={{ width: 96, height: 54, objectFit: 'cover', borderRadius: 8, flexShrink: 0, background: 'var(--surface-3)' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+                  <div style={{
+                    fontWeight: 700, fontSize: 14, color: 'var(--text)',
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                    display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  }}>
+                    {ytMeta.title}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {ytMeta.duration > 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)' }}>
+                        {ytFormatDuration(ytMeta.duration)}
+                      </span>
+                    )}
+                    {ytMeta.estimatedSizeMb > 0 && (
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-faint)' }}>
+                        ~{ytMeta.estimatedSizeMb} MB
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Status messages */}
+            {ytStatus === 'pending_approval' && (
+              <div style={{ padding: '11px 14px', borderRadius: 10, background: 'rgba(88,101,242,0.12)', border: '1px solid rgba(88,101,242,0.4)', fontSize: 13, fontWeight: 600, color: '#8b96f0' }}>
+                ⏳ Awaiting approval — a notification was sent to Discord. The download will start once approved.
+              </div>
+            )}
+            {ytStatus === 'downloading' && (
+              <div style={{ padding: '11px 14px', borderRadius: 10, background: 'var(--accent-soft)', border: '1px solid var(--accent)', fontSize: 13, fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 13, height: 13, borderRadius: '50%', flexShrink: 0, border: '2px solid var(--accent)', borderTopColor: 'transparent', animation: 'yt-spin 0.7s linear infinite' }} />
+                Downloading… this may take a moment.
+              </div>
+            )}
+            {ytStatus === 'done' && (
+              <div style={{ padding: '11px 14px', borderRadius: 10, background: 'rgba(59,165,92,0.12)', border: '1px solid rgba(59,165,92,0.4)', fontSize: 13, fontWeight: 700, color: '#3ba55c' }}>
+                ✅ Added to queue!
+              </div>
+            )}
+            {ytStatus === 'denied' && (
+              <div style={{ padding: '11px 14px', borderRadius: 10, background: 'rgba(237,66,69,0.12)', border: '1px solid rgba(237,66,69,0.4)', fontSize: 13, fontWeight: 600, color: '#ed4245' }}>
+                ❌ Request denied.
+              </div>
+            )}
+            {ytStatus === 'error' && ytError && (
+              <div style={{ padding: '11px 14px', borderRadius: 10, background: 'rgba(237,66,69,0.12)', border: '1px solid rgba(237,66,69,0.4)', fontSize: 13, fontWeight: 600, color: '#ed4245' }}>
+                Error: {ytError}
+              </div>
+            )}
+
+            {/* Download button */}
+            {ytStatus === 'ready' && ytMeta && (
+              <button
+                onClick={handleYtDownload}
+                style={{
+                  width: '100%', padding: '12px 18px', borderRadius: 10, border: 'none',
+                  background: 'var(--accent)', color: 'var(--accent-ink)',
+                  fontWeight: 800, fontSize: 14, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 8px 20px -8px var(--accent)',
+                }}
+              >
+                <Icon name="plus" size={16} /> Download &amp; Add to Queue
+              </button>
+            )}
+            <style>{`@keyframes yt-spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
+        {/* Items — library tab only */}
+        {tab === 'library' && (
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '0 12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
 
           {/* Favourites — only shown when not actively searching */}
@@ -378,6 +655,7 @@ export function JellyfinBrowser({ onAdd, onClose }: Props) {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );

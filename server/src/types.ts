@@ -8,12 +8,13 @@ export interface Member {
 export interface Video {
   id: string;
   title: string;
-  source: 'jellyfin' | 'upload';
+  source: 'jellyfin' | 'upload' | 'youtube';
   streamUrl: string;
   isHls?: boolean;
   thumbnailUrl?: string;
   duration?: number;
   jellyfinId?: string;
+  ytDownloadId?: string;
 }
 
 export interface PlaybackState {

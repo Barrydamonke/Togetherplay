@@ -17,4 +17,5 @@ services:
       - DISCORD_CLIENT_SECRET=
     volumes:
       - /change/me:/data # path to the folder of togetherplay data (config, logs, etc.)
+      - /change/me/downloads:/downloads # downloaded YouTube videos (set ytdlpDownloadDir to /downloads in admin settings)
     restart: unless-stopped
