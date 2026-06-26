@@ -1,11 +1,11 @@
 {
   "name": "togetherplay-server",
-  "version": "1.5",
+  "version": "1.5.1",
   "private": true,
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "build": "tsc",
-    "start": "node --env-file=.env dist/index.js"
+    "start": "node --env-file-if-exists=.env dist/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

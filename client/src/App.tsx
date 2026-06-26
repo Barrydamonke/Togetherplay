@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Room as RoomType } from './types';
 import { Landing } from './components/Landing';
 import { Room } from './components/Room';
+import { AdminPanel } from './components/AdminPanel';
 import { getSocket, disconnectSocket } from './lib/socket';
 import { DiscordContext } from './lib/discord';
 
@@ -21,6 +22,22 @@ export default function App({ discordContext }: Props) {
   const [theme, setTheme] = useState<'dark' | 'light'>(
     () => (localStorage.getItem('tg-theme') as 'dark' | 'light') || 'dark',
   );
+  const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+  const [showAdminForSetup, setShowAdminForSetup] = useState(false);
+
+  useEffect(() => {
+    fetch('/admin/setup-status')
+      .then((r) => r.json())
+      .then((d: { setupComplete: boolean }) => setSetupComplete(d.setupComplete))
+      .catch(() => setSetupComplete(true)); // assume complete if unreachable
+  }, []);
+
+  function recheckSetup() {
+    fetch('/admin/setup-status')
+      .then((r) => r.json())
+      .then((d: { setupComplete: boolean }) => setSetupComplete(d.setupComplete))
+      .catch(() => setSetupComplete(true));
+  }
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -127,6 +144,51 @@ export default function App({ discordContext }: Props) {
 
   function toggleTheme() {
     setTheme((p) => (p === 'dark' ? 'light' : 'dark'));
+  }
+
+  if (setupComplete === false) {
+    return (
+      <>
+        <div style={{
+          height: '100vh', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: 'var(--bg)', color: 'var(--text)', padding: 24, textAlign: 'center',
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16, marginBottom: 20,
+            background: 'var(--accent-soft)', color: 'var(--accent)',
+            display: 'grid', placeItems: 'center', fontSize: 28,
+          }}>
+            ⚙️
+          </div>
+          <h1 className="font-display" style={{ fontSize: 26, fontWeight: 700, margin: '0 0 10px' }}>
+            Setup required
+          </h1>
+          <p style={{ fontSize: 15, color: 'var(--text-dim)', fontWeight: 600, maxWidth: 360, margin: '0 0 28px', lineHeight: 1.6 }}>
+            Complete first-time setup in the admin panel before the app is accessible.
+            Your auto-generated password was printed to the server console.
+          </p>
+          <button
+            onClick={() => setShowAdminForSetup(true)}
+            style={{
+              padding: '13px 28px', borderRadius: 10, border: 'none',
+              background: 'var(--accent)', color: 'var(--accent-ink)',
+              fontWeight: 800, fontSize: 15, cursor: 'pointer',
+              boxShadow: '0 8px 20px -8px var(--accent)',
+            }}
+          >
+            Open admin panel
+          </button>
+        </div>
+        {showAdminForSetup && (
+          <AdminPanel onClose={() => { setShowAdminForSetup(false); recheckSetup(); }} />
+        )}
+      </>
+    );
+  }
+
+  if (setupComplete === null) {
+    return null; // brief loading flash while checking setup status
   }
 
   if (discordContext && !room) {

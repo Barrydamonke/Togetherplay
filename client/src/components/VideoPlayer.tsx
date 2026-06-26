@@ -616,6 +616,7 @@ export function VideoPlayer({ streamUrl, isHls = true, knownDuration, jellyfinId
               src={idleGameUrl}
               style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
               allow="autoplay"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
             />
           : 'No video selected'}
       </div>

@@ -28,11 +28,27 @@ function checkAuth(req: Request, res: Response): boolean {
   return true;
 }
 
+function validateVideoUrl(url: string): string | null {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return 'Invalid URL'; }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return 'Only http/https URLs are allowed';
+  const host = parsed.hostname;
+  if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|localhost$)/i.test(host)) {
+    return 'Private/loopback addresses are not allowed';
+  }
+  return null;
+}
+
 // GET /api/youtube/info?url=...
 router.get('/info', async (req: Request, res: Response) => {
   const { url } = req.query as { url?: string };
   if (!url) {
     res.status(400).json({ error: 'Missing url parameter' });
+    return;
+  }
+  const urlError = validateVideoUrl(url);
+  if (urlError) {
+    res.status(400).json({ error: urlError });
     return;
   }
   const { ytdlpPath } = getConfig();
@@ -45,12 +61,13 @@ router.get('/info', async (req: Request, res: Response) => {
     res.json(metadata);
   } catch (err) {
     console.error('[yt-dlp] fetchMetadata error:', err);
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'Failed to fetch video metadata. Check server logs.' });
   }
 });
 
 // POST /api/youtube/download
 router.post('/download', async (req: Request, res: Response) => {
+  if (!checkAuth(req, res)) return;
   const { url, title, thumbnailUrl, duration, estimatedSizeMb, requestedBy } = req.body as {
     url: string;
     title: string;
@@ -62,6 +79,11 @@ router.post('/download', async (req: Request, res: Response) => {
 
   if (!url || !title) {
     res.status(400).json({ error: 'url and title are required' });
+    return;
+  }
+  const urlError = validateVideoUrl(url);
+  if (urlError) {
+    res.status(400).json({ error: urlError });
     return;
   }
   const { ytdlpPath } = getConfig();

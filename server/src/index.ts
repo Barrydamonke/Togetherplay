@@ -10,8 +10,10 @@ import roomsRouter from './routes/rooms';
 import discordRouter from './routes/discord';
 import suggestionsRouter from './routes/suggestions';
 import youtubeRouter from './routes/youtube';
-import { getConfig } from './config';
+import { initConfig, getConfig } from './config';
 import { initDownloadManager } from './youtube';
+
+initConfig();
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,6 +23,15 @@ const io = new Server(httpServer, {
 
 app.use(cors());
 app.use(express.json());
+
+// Block all /api/* routes until setup is complete.
+// Admin routes live at /admin/* and are always accessible.
+app.use('/api', (_req, res, next) => {
+  if (getConfig().setupComplete) return next();
+  res.status(503).json({
+    error: 'Setup required — visit /admin to complete first-time setup before using the app.',
+  });
+});
 
 app.use('/api/jellyfin', jellyfinRouter);
 app.use('/api/rooms', roomsRouter);
