@@ -659,10 +659,9 @@ export function AdminPanel({ onClose }: Props) {
                     border: '1.5px solid var(--border)', background: 'var(--surface-2)',
                     fontSize: 13, color: 'var(--text-faint)', lineHeight: 1.5,
                   }}>
-                    To change the Client ID, set{' '}
-                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>VITE_DISCORD_CLIENT_ID</code> (build arg) and{' '}
-                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>DISCORD_CLIENT_ID</code> (environment) in your{' '}
-                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>docker-compose.yml</code>, then rebuild the image.
+                    Set{' '}
+                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>DISCORD_CLIENT_ID</code> in the environment section of your{' '}
+                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>docker-compose.yml</code>. No rebuild required.
                   </div>
                 </div>
                 <Field

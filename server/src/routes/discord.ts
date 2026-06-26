@@ -10,7 +10,7 @@ router.post('/token', async (req: Request, res: Response) => {
     return;
   }
 
-  const clientId = process.env.DISCORD_CLIENT_ID; // build-time env var; must match the VITE_DISCORD_CLIENT_ID baked into the client bundle
+  const clientId = process.env.DISCORD_CLIENT_ID;
   const clientSecret = getConfig().discordClientSecret; // set in admin panel; falls back to env var via config
   if (!clientId || !clientSecret) {
     res.status(500).json({ error: 'Discord not configured — set DISCORD_CLIENT_ID (env) and Discord Client Secret (admin panel)' });

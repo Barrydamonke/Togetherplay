@@ -1,11 +1,9 @@
 services:
   togetherplay:
-    build:
-      context: /change/me # path to the Togetherplay source code on your server (e.g. /mnt/user/appdata/togetherplay)
-      args:
-        # Baked into the client bundle at build time.
-        # Set this to your Discord Application ID, then rebuild the image.
-        VITE_DISCORD_CLIENT_ID: ""
+    image: barrydamonke/togetherplay:latest
+    # To build from source instead, replace the image line above with:
+    # build:
+    #   context: /change/me # path to the Togetherplay source code on your server
     container_name: togetherplay
     ports:
       - "3000:3000"
@@ -14,11 +12,11 @@ services:
       # Admin password is auto-generated on first boot if not set.
       # Check container logs for the generated password, then update it in the admin panel.
       # - ADMIN_PASSWORD=
-      # Discord Activity — fill in after creating an app at discord.com/developers
+      # Discord Activity (optional) — create an app at discord.com/developers
       # DISCORD_CLIENT_SECRET can also be set in the admin panel instead.
       - DISCORD_CLIENT_ID=
       - DISCORD_CLIENT_SECRET=
     volumes:
-      - /change/me:/data # path to the folder of togetherplay data (config, logs, etc.)
+      - /change/me:/data # persistent data folder (config.json, etc.)
       - /change/me/downloads:/downloads # downloaded YouTube videos (set ytdlpDownloadDir to /downloads in admin settings)
     restart: unless-stopped

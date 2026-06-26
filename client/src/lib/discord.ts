@@ -15,9 +15,15 @@ export async function tryInitDiscord(): Promise<DiscordContext | null> {
   // Discord injects frame_id into the URL when loading as an Activity.
   if (!new URLSearchParams(window.location.search).has('frame_id')) return null;
 
-  const clientId = import.meta.env.VITE_DISCORD_CLIENT_ID as string | undefined;
+  let clientId: string | undefined;
+  try {
+    const cfg = await fetch('/api/client-config').then((r) => r.json()) as { discordClientId?: string };
+    clientId = cfg.discordClientId || undefined;
+  } catch {
+    // server unreachable
+  }
   if (!clientId) {
-    console.warn('[Discord] VITE_DISCORD_CLIENT_ID not set — cannot init Activity');
+    console.warn('[Discord] DISCORD_CLIENT_ID not set on the server — cannot init Activity');
     return null;
   }
 
