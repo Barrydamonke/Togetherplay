@@ -32,6 +32,7 @@ COPY --from=server-deps  /build/node_modules ./server/node_modules
 COPY --from=client-build /build/dist    ./client/dist
 
 ENV NODE_ENV=production
+VOLUME ["/data", "/downloads"]
 EXPOSE 3000
 
 WORKDIR /app/server
