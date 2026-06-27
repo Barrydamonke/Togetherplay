@@ -1,55 +1,119 @@
 # Togetherplay
 
-Watch videos together in real time. One person hosts a room, shares a PIN, and everyone stays perfectly in sync — pause, seek, and chat like you're on the same couch. Streams directly from your own Jellyfin server.
+Watch videos together in real time. One person hosts a room, everyone stays perfectly in sync — pause, seek, chat, and queue videos like you're on the same couch. Streams directly from your own Jellyfin server, with optional YouTube downloads and Discord Activity support.
 
 ---
 
-## How it works
+## Features
 
-- The **host** creates a room and gets a 4-digit PIN
-- **Guests** join with that PIN, or pick a room from the public browser on the landing page
-- The host controls playback (play, pause, seek); everyone follows automatically
-- Each person controls their own volume and subtitles independently
-- A built-in chat runs alongside the video
-- When no video is queued, the idle screen can display a custom embed — or just a plain "No video selected" message
-
----
-
-## Prerequisites
-
-- Node.js 18 or later
-- A running [Jellyfin](https://jellyfin.org) server (reachable over the network or via a Cloudflare Tunnel)
+- **Synced playback** — host controls play, pause, and seek; everyone follows automatically
+- **Jellyfin integration** — browse and queue from your own library
+- **YouTube downloads** — add YouTube videos to the queue via yt-dlp
+- **Chat** — built-in live chat alongside the video
+- **Public room browser** — rooms visible on the landing page, or private with a PIN
+- **Queue management** — add, reorder, and remove; autoplay to next item
+- **Room permissions** — optionally let viewers manage the queue or control playback
+- **Subtitles** — per-user subtitle track selection, doesn't affect others
+- **Aspect ratio lock** — 16:9, 4:3, 2.39:1, or auto
+- **Discord Activity** — watch together directly inside a Discord voice channel
+- **Suggestions** — users can submit media or feature suggestions via webhook
 
 ---
 
-## Local development
+## Self-hosting with Docker (recommended)
 
-**1. Install dependencies**
+### Docker Compose
 
-```bash
-npm run install:all
+```yaml
+services:
+  togetherplay:
+    image: barrydamonke/togetherplay:latest
+    container_name: togetherplay
+    ports:
+      - "3000:3000"
+    environment:
+      - DATA_DIR=/data
+      # Admin password is auto-generated on first boot if not set.
+      # Check container logs for the generated password, then update it in the admin panel.
+      # - ADMIN_PASSWORD=
+      # Discord Activity (optional) — see Discord Activity section below
+      # - DISCORD_CLIENT_ID=
+      # - DISCORD_CLIENT_SECRET=
+    volumes:
+      - /your/path/here:/data              # persistent config — required
+      - /your/path/here/downloads:/downloads  # yt-dlp downloads — optional
+    restart: unless-stopped
 ```
 
-**2. Create the server environment file**
-
-Copy the example and fill in your values:
+Replace `/your/path/here` with a folder on your host, then:
 
 ```bash
-cp .env.example server/.env
+docker compose up -d
 ```
+
+### Unraid
+
+See [`unraid-template.xml`](./unraid-template.xml) — copy it to `/boot/config/plugins/dockerMan/templates-user/` on your server, then use **Add Container** in the Docker tab to get pre-filled fields.
+
+### Updating
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Your config is preserved as long as `/data` is mounted to a host path.
+
+---
+
+## First Boot
+
+On first boot the site is locked until you complete setup. An admin password is auto-generated and printed to the container logs:
+
+```bash
+docker logs togetherplay
+```
+
+Open `http://your-server-ip:3000/admin`, log in with the generated password, and fill in your Jellyfin details. The site unlocks after your first save.
+
+---
+
+## Environment Variables
+
+All settings can be configured through the admin panel. These env vars are optional overrides:
 
 | Variable | Description |
 |---|---|
-| `JELLYFIN_URL` | Full URL to your Jellyfin server, e.g. `https://media.example.com` |
-| `JELLYFIN_API_KEY` | API key from Jellyfin → Dashboard → API Keys |
-| `JELLYFIN_USER_ID` | Your Jellyfin user ID (found in Dashboard → Users → click your user) |
-| `ADMIN_PASSWORD` | Password for the in-app admin panel |
+| `DATA_DIR` | **Required.** Set to `/data` — must match the volume mount. |
+| `ADMIN_PASSWORD` | Override the auto-generated admin password. |
+| `DISCORD_CLIENT_ID` | Discord application client ID. Can also be set in the admin panel. |
+| `DISCORD_CLIENT_SECRET` | Discord application client secret. Can also be set in the admin panel. |
 
-**3. Start the servers**
+---
 
-In two separate terminals:
+## Discord Activity (optional)
+
+Togetherplay can run as a Discord Activity — users watch together directly inside a voice channel with no external browser needed.
+
+**Setup requires a Discord application and a public domain for both Togetherplay and Jellyfin** (e.g. via Cloudflare Tunnel).
+
+1. Create an application at [discord.com/developers](https://discord.com/developers)
+2. Enable **Activities**
+3. Under **URL Mappings**, add:
+   - Root (`/`) → your Togetherplay domain (e.g. `togetherplay.example.com`)
+   - `/proxy/jellyfin` → your Jellyfin domain (e.g. `jellyfin.example.com`)
+4. Set your **Client ID** and **Client Secret** in the admin panel
+
+---
+
+## Local Development
+
+**Requirements:** Node.js 20+
 
 ```bash
+# Install all dependencies
+npm run install:all
+
 # Terminal 1 — Express server (port 3000)
 npm run dev:server
 
@@ -57,113 +121,43 @@ npm run dev:server
 npm run dev:client
 ```
 
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:5173`. On first run you'll be prompted to complete admin setup before the app unlocks — this works the same as in Docker.
 
----
-
-## Admin panel
-
-If you prefer not to use a `.env` file, all Jellyfin settings can be configured from the app itself.
-
-1. Click **Admin** in the top-right corner of the landing page
-2. Enter your `ADMIN_PASSWORD`
-3. Fill in the Jellyfin URL, API Key, and User ID, then click **Save changes**
-
-Settings are saved to `server/config.json` and take effect immediately without a restart. This file is gitignored — it will never be committed.
-
----
-
-## Self-hosting with Docker
-
-A `Dockerfile` and `docker-compose.yml` are included for self-hosted deployments (e.g. Unraid, a home server, or any VPS).
-
-### Quick start
+Optionally copy `.env.example` to `server/.env` to pre-fill credentials instead of using the admin panel:
 
 ```bash
-# Clone the repo
-git clone https://github.com/Barrydamonke/Togetherplay.git
-cd Togetherplay
-
-# Set your admin password in docker-compose.yml, then:
-docker compose up -d
-```
-
-Open `http://<your-server-ip>:3000` in your browser.
-
-### Environment variables
-
-Set these in `docker-compose.yml` under `environment:`, or configure Jellyfin settings later through the in-app admin panel.
-
-| Variable | Required | Description |
-|---|---|---|
-| `ADMIN_PASSWORD` | Yes | Password for the admin panel |
-| `DATA_DIR` | Yes (set in compose) | Directory where `config.json` is stored — mount a volume here |
-| `JELLYFIN_URL` | No* | Full URL to your Jellyfin server |
-| `JELLYFIN_API_KEY` | No* | Jellyfin API key |
-| `JELLYFIN_USER_ID` | No* | Jellyfin user ID |
-
-*Can be configured at any time through the admin panel instead.
-
-### Volumes
-
-The compose file creates a named volume (`togetherness_data`) mounted at `/data`. This is where `config.json` is persisted so your settings survive container updates and restarts.
-
-### Updating
-
-```bash
-git pull
-docker compose up -d --build
+cp .env.example server/.env
 ```
 
 ---
 
-## Using the app
+## Using the App
 
-### Creating a room (host)
+### Creating a room
 
 1. Enter your name and click **Create a room**
-2. Share the 4-digit PIN shown in the sidebar with your friends
-3. Click the folder icon in the sidebar to open your Jellyfin library
-4. Browse or search for a title and click **Queue** to add it
-5. Press play when everyone has joined
+2. Share the 4-digit PIN with your friends
+3. Click the folder icon to open the Jellyfin browser, or the YouTube icon to add a download
+4. Press play when everyone has joined
 
-### Joining a room (guest)
+### Joining a room
 
-1. Enter your name and either:
-   - Click a room in the **public room browser** on the landing page, or
-   - Click **Join with a PIN** and type the 4-digit PIN the host gave you
-2. Playback is controlled by the host — your volume and subtitles are your own
-
-### Subtitles
-
-Click the **CC** button in the video player controls to open the subtitle track selector. Pick any available track or select **Off**. This setting is local to you and does not affect anyone else in the room.
-
-### Queue management
-
-The host (and any viewers granted permission) can add, reorder, and remove videos using the queue panel in the sidebar. When the current video ends, the next one in the queue starts automatically.
+1. Enter your name and either click a room in the public browser, or click **Join with a PIN**
+2. Playback is controlled by the host — volume and subtitles are per-user
 
 ### Room settings (host only)
 
-Click the **settings** icon in the top-right of the sidebar to open the room settings panel.
+Open the **settings** icon in the sidebar:
 
-- **Hidden room** — removes the room from the public browser; guests must use the PIN
-- **Viewers can manage queue** — lets guests add videos and reorder the queue
+- **Hidden room** — removes the room from the public browser
+- **Viewers can manage queue** — lets guests add and reorder videos
 - **Viewers can control playback** — lets guests play, pause, and seek
-- **Idle screen embed URL** — paste any URL to display it as an iframe when no video is queued (leave blank for the default "No video selected" message)
-
-### Video stats overlay
-
-Toggle **Video stats overlay** in the settings panel to show codec, resolution, buffer level, and stream info directly on the player.
-
-### Aspect ratio
-
-The **Display** section of the settings panel lets you lock the player to a specific aspect ratio (16:9, 4:3, 2.39:1) or leave it on **Auto** to resize to each video's native dimensions.
+- **Idle screen embed URL** — show a custom iframe when no video is queued
+- **Aspect ratio** — lock the player to a specific ratio or leave on Auto
 
 ---
 
-## Coming soon
+## Coming Soon
 
-- **Upload service** — drop a video file directly into the room without needing a Jellyfin library
-- **Persistent rooms** — room state currently lives in memory; a server restart clears active sessions
-- **Rate limiting** — no throttling on socket events or API endpoints yet
-- **Discord Activity Intergration** - This will work as a discord activity at some point in the future
+- **Upload service** — drop a video file directly into a room without needing Jellyfin
+- **Persistent rooms** — room state is currently in-memory; a server restart clears active sessions

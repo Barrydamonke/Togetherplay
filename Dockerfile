@@ -29,8 +29,7 @@ WORKDIR /app
 # the Alpine apk package pulling in Deno as a transitive dependency.
 RUN apk upgrade --no-cache openssl && \
     apk add --no-cache ffmpeg python3 py3-pip && \
-    pip3 install --break-system-packages yt-dlp && \
-    ln -sf /usr/local/bin/yt-dlp /usr/bin/yt-dlp
+    pip3 install --break-system-packages yt-dlp
 
 COPY --from=server-build /build/dist    ./server/dist
 COPY --from=server-deps  /build/node_modules ./server/node_modules

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { getConfig } from '../config';
+import { getConfig, resolveAdminPassword } from '../config';
 import {
   fetchMetadata,
   createDownload,
@@ -16,9 +16,9 @@ import {
 const router = Router();
 
 function checkAuth(req: Request, res: Response): boolean {
-  const password = process.env.ADMIN_PASSWORD;
+  const password = resolveAdminPassword();
   if (!password) {
-    res.status(503).json({ error: 'ADMIN_PASSWORD is not configured.' });
+    res.status(503).json({ error: 'Admin password is not configured.' });
     return false;
   }
   if (req.headers['x-admin-password'] !== password) {
@@ -67,7 +67,6 @@ router.get('/info', async (req: Request, res: Response) => {
 
 // POST /api/youtube/download
 router.post('/download', async (req: Request, res: Response) => {
-  if (!checkAuth(req, res)) return;
   const { url, title, thumbnailUrl, duration, estimatedSizeMb, requestedBy } = req.body as {
     url: string;
     title: string;
