@@ -1,4 +1,4 @@
-import { useState, CSSProperties } from 'react';
+import { useState, useRef, CSSProperties } from 'react';
 import { Room, AspectRatio } from '../types';
 import { Icon } from './Icon';
 
@@ -96,9 +96,12 @@ export function RoomSettings({ room, isHost, currentUsername, aspectRatio, onSet
     setTimeout(() => setIdleGameSaved(false), 1400);
   }
 
+  const scrimDown = useRef(false);
+
   return (
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => { scrimDown.current = e.target === e.currentTarget; }}
+      onMouseUp={(e) => { if (scrimDown.current && e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
         background: 'var(--scrim)',

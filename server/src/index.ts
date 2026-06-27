@@ -45,7 +45,7 @@ app.get('/api/landing-message', (_req, res) => {
 });
 
 app.get('/api/client-config', (_req, res) => {
-  res.json({ discordClientId: process.env.DISCORD_CLIENT_ID || '' });
+  res.json({ discordClientId: getConfig().discordClientId });
 });
 
 const clientDist = path.join(__dirname, '../../client/dist');

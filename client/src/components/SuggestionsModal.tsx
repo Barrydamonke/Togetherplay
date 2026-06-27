@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Icon } from './Icon';
 
 interface Props {
@@ -43,10 +43,12 @@ export function SuggestionsModal({ roomPin, onClose }: Props) {
 
   const selected = TYPES.find(t => t.id === type);
   const canSend = type !== null && message.trim().length > 0 && (status === 'idle' || status === 'error');
+  const scrimDown = useRef(false);
 
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => { scrimDown.current = e.target === e.currentTarget; }}
+      onMouseUp={(e) => { if (scrimDown.current && e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
         background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',

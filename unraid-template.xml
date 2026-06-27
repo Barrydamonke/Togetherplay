@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>togetherplay</Name>
+  <Repository>barrydamonke/togetherplay:latest</Repository>
+  <Registry>https://hub.docker.com/r/barrydamonke/togetherplay/</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Barrydamonke/Togetherplay/issues</Support>
+  <Project>https://github.com/Barrydamonke/Togetherplay</Project>
+  <Overview>Watch your media together, in real time.</Overview>
+  <Category>MediaServer: Other:</Category>
+  <WebUI>http://[IP]:[PORT:3000]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/Barrydamonke/Togetherplay/main/unraid-template.xml</TemplateURL>
+  <Icon></Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <DonateText></DonateText>
+  <DonateLink></DonateLink>
+
+  <!-- Ports -->
+  <Config Name="Web UI Port" Target="3000" Default="3000" Mode="tcp"
+    Description="Port for the Togetherplay web interface."
+    Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+
+  <!-- Volumes -->
+  <Config Name="Data Directory" Target="/data" Default="/mnt/user/appdata/togetherplay" Mode="rw"
+    Description="Persistent storage for config.json and other app data. Your settings survive here across container updates."
+    Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/togetherplay</Config>
+
+  <Config Name="Downloads Directory" Target="/downloads" Default="/mnt/user/appdata/togetherplay/downloads" Mode="rw"
+    Description="Where yt-dlp saves downloaded YouTube videos. Set ytdlpDownloadDir to /downloads in the admin panel."
+    Type="Path" Display="always" Required="false" Mask="false">/mnt/user/appdata/togetherplay/downloads</Config>
+
+  <!-- Environment variables -->
+  <Config Name="DATA_DIR" Target="DATA_DIR" Default="/data" Mode=""
+    Description="Internal path where config.json is stored. Must match the container path for the Data Directory volume above."
+    Type="Variable" Display="advanced" Required="true" Mask="false">/data</Config>
+
+  <Config Name="Admin Password" Target="ADMIN_PASSWORD" Default="" Mode=""
+    Description="Admin panel password. Leave blank to auto-generate one on first boot — check container logs for the generated password, then update it in the admin panel."
+    Type="Variable" Display="always" Required="false" Mask="true"></Config>
+
+  <Config Name="Discord Client ID" Target="DISCORD_CLIENT_ID" Default="" Mode=""
+    Description="Optional. Your Discord application client ID for Discord Activity support. Can also be set in the admin panel after first boot."
+    Type="Variable" Display="always" Required="false" Mask="false"></Config>
+
+  <Config Name="Discord Client Secret" Target="DISCORD_CLIENT_SECRET" Default="" Mode=""
+    Description="Optional. Your Discord application client secret for Discord Activity support. Can also be set in the admin panel after first boot."
+    Type="Variable" Display="always" Required="false" Mask="true"></Config>
+</Container>

@@ -141,10 +141,12 @@ export function YouTubePanel({ onAdd, onClose, username }: Props) {
   }
 
   const isWorking = status === 'fetching' || status === 'downloading' || status === 'pending_approval' || status === 'done';
+  const scrimDown = useRef(false);
 
   return (
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => { scrimDown.current = e.target === e.currentTarget; }}
+      onMouseUp={(e) => { if (scrimDown.current && e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 60,
         background: 'var(--scrim)',

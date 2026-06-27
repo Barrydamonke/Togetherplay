@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { useUpdateCheck } from '../lib/useUpdateCheck';
 
@@ -131,9 +131,12 @@ export function ReleaseNotes({ onClose, onOpenAdmin }: Props) {
     }
   }
 
+  const scrimDown = useRef(false);
+
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => { scrimDown.current = e.target === e.currentTarget; }}
+      onMouseUp={(e) => { if (scrimDown.current && e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',

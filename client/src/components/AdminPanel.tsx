@@ -1,4 +1,4 @@
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect, useRef, CSSProperties } from 'react';
 import { Icon } from './Icon';
 import { useUpdateCheck } from '../lib/useUpdateCheck';
 
@@ -21,6 +21,7 @@ interface Config {
   ytdlpApprovalWebhookUrl: string;
   // write-only: always comes back empty from the server; supply to change
   adminPassword: string;
+  discordClientId: string;
   discordClientSecret: string;
 }
 
@@ -140,7 +141,7 @@ export function AdminPanel({ onClose }: Props) {
     ytdlpPath: '/usr/bin/yt-dlp', ytdlpDownloadDir: '/downloads',
     ytdlpDefaultArgs: '-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4',
     ytdlpApprovalRequired: false, ytdlpApprovalWebhookUrl: '',
-    adminPassword: '', discordClientSecret: '',
+    adminPassword: '', discordClientId: '', discordClientSecret: '',
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState('');
@@ -278,9 +279,12 @@ export function AdminPanel({ onClose }: Props) {
     return (v: boolean) => setConfig((c) => ({ ...c, [key]: v }));
   }
 
+  const scrimDown = useRef(false);
+
   return (
     <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => { scrimDown.current = e.target === e.currentTarget; }}
+      onMouseUp={(e) => { if (scrimDown.current && e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed', inset: 0, zIndex: 100,
         background: 'var(--scrim)',
@@ -652,18 +656,13 @@ export function AdminPanel({ onClose }: Props) {
             <section>
               <SectionHead label="Discord Activity" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <span style={labelStyle}>Client ID</span>
-                  <div style={{
-                    padding: '10px 13px', borderRadius: 10,
-                    border: '1.5px solid var(--border)', background: 'var(--surface-2)',
-                    fontSize: 13, color: 'var(--text-faint)', lineHeight: 1.5,
-                  }}>
-                    Set{' '}
-                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>DISCORD_CLIENT_ID</code> in the environment section of your{' '}
-                    <code style={{ fontFamily: 'monospace', fontSize: 12 }}>docker-compose.yml</code>. No rebuild required.
-                  </div>
-                </div>
+                <Field
+                  label="Client ID"
+                  value={config.discordClientId}
+                  onChange={patch('discordClientId')}
+                  placeholder="your_discord_application_id"
+                  mono
+                />
                 <Field
                   label="Client Secret"
                   value={config.discordClientSecret}

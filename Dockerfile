@@ -24,8 +24,13 @@ RUN npm ci --omit=dev
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Install yt-dlp (from Alpine community repo) and ffmpeg (required to merge video+audio streams)
-RUN apk add --no-cache ffmpeg yt-dlp
+# Upgrade openssl to pick up security patches, then install ffmpeg and yt-dlp.
+# yt-dlp is installed via pip rather than apk to get the latest version and avoid
+# the Alpine apk package pulling in Deno as a transitive dependency.
+RUN apk upgrade --no-cache openssl && \
+    apk add --no-cache ffmpeg python3 py3-pip && \
+    pip3 install --break-system-packages yt-dlp && \
+    ln -sf /usr/local/bin/yt-dlp /usr/bin/yt-dlp
 
 COPY --from=server-build /build/dist    ./server/dist
 COPY --from=server-deps  /build/node_modules ./server/node_modules

@@ -10,10 +10,9 @@ router.post('/token', async (req: Request, res: Response) => {
     return;
   }
 
-  const clientId = process.env.DISCORD_CLIENT_ID;
-  const clientSecret = getConfig().discordClientSecret; // set in admin panel; falls back to env var via config
+  const { discordClientId: clientId, discordClientSecret: clientSecret } = getConfig();
   if (!clientId || !clientSecret) {
-    res.status(500).json({ error: 'Discord not configured — set DISCORD_CLIENT_ID (env) and Discord Client Secret (admin panel)' });
+    res.status(500).json({ error: 'Discord not configured — set Client ID and Client Secret in the admin panel' });
     return;
   }
 

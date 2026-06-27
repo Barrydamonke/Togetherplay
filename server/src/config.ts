@@ -16,6 +16,7 @@ export interface AppConfig {
   ytdlpApprovalRequired: boolean;
   ytdlpApprovalWebhookUrl: string;
   adminPassword: string;
+  discordClientId: string;
   discordClientSecret: string;
   setupComplete: boolean;
 }
@@ -60,6 +61,7 @@ function buildConfig(stored: Partial<AppConfig>): AppConfig {
     jellyfinApiKey:   envFallback(stored.jellyfinApiKey   ?? '', 'JELLYFIN_API_KEY',    'Jellyfin API Key'),
     jellyfinUserId:   envFallback(stored.jellyfinUserId   ?? '', 'JELLYFIN_USER_ID',    'Jellyfin User ID'),
     uploadServiceUrl: envFallback(stored.uploadServiceUrl ?? '', 'UPLOAD_SERVICE_URL',  'Upload Service URL'),
+    discordClientId:     envFallback(stored.discordClientId     ?? '', 'DISCORD_CLIENT_ID',     'Discord Client ID'),
     discordClientSecret: envFallback(stored.discordClientSecret ?? '', 'DISCORD_CLIENT_SECRET', 'Discord Client Secret'),
     githubRepoUrl:    stored.githubRepoUrl    ?? 'https://github.com/Barrydamonke/Togetherplay',
     landingMessage:   stored.landingMessage   ?? '',

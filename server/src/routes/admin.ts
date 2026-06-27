@@ -85,6 +85,7 @@ router.post('/config', (req: Request, res: Response) => {
     ytdlpDefaultArgs:   body.ytdlpDefaultArgs    ?? '-f bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4] --merge-output-format mp4',
     ytdlpApprovalRequired:  body.ytdlpApprovalRequired  ?? false,
     ytdlpApprovalWebhookUrl: body.ytdlpApprovalWebhookUrl ?? '',
+    discordClientId:     body.discordClientId     ?? current.discordClientId,
     discordClientSecret: body.discordClientSecret ?? current.discordClientSecret,
     adminPassword: newPassword || current.adminPassword,
     setupComplete: true, // first successful save marks setup complete

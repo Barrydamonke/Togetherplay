@@ -281,9 +281,12 @@ export function JellyfinBrowser({ onAdd, onClose, username }: Props) {
     }
   }
 
+  const scrimDown = useRef(false);
+
   return (
     <div
-      onClick={onClose}
+      onMouseDown={(e) => { scrimDown.current = e.target === e.currentTarget; }}
+      onMouseUp={(e) => { if (scrimDown.current && e.target === e.currentTarget) onClose(); }}
       className="animate-pop-in"
       style={{
         position: 'fixed', inset: 0, zIndex: 50,
